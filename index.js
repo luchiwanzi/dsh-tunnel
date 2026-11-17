@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { parseSubscription, parseUserinfo } from './lib/subscription.js';
+import { isBlockedHostname, isBlockedIp, parseIpv4 } from './lib/ip.js';
 import {
   buildConfig,
   CORE_VERSION,
@@ -442,105 +443,13 @@ function enqueue(task) {
   return run;
 }
 
-// 订阅地址安全校验所需的私有/保留网段（与 mihomo 配置的直连规则保持一致）。
-const BLOCKED_HOSTS = new Set(['localhost', 'localhost.localdomain', 'metadata.google.internal']);
-const BLOCKED_CIDRS = [
-  '127.0.0.0/8',
-  '0.0.0.0/8',
-  '10.0.0.0/8',
-  '172.16.0.0/12',
-  '192.168.0.0/16',
-  '169.254.0.0/16',
-  '100.64.0.0/10',
-  '::1/128',
-  'fc00::/7',
-  'fe80::/10',
-];
-
-function ipv4ToInt(ip) {
-  const parts = ip.split('.').map(Number);
-  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
-  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
-}
-
-function parseIpv4(value) {
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
-  return m ? ipv4ToInt(value) : null;
-}
-
-function ipv6ToBytes(ip) {
-  const normalized = ip.toLowerCase();
-  if (normalized.includes('::')) {
-    const [head, tail] = normalized.split('::');
-    const headParts = head === '' ? [] : head.split(':').filter(Boolean);
-    const tailParts = tail === '' ? [] : tail.split(':').filter(Boolean);
-    const zeroCount = 8 - headParts.length - tailParts.length;
-    if (zeroCount < 0) return null;
-    const parts = [...headParts, ...Array(zeroCount).fill('0'), ...tailParts];
-    if (parts.length !== 8) return null;
-    return parseHextets(parts);
-  }
-  const parts = normalized.split(':');
-  if (parts.length !== 8) return null;
-  return parseHextets(parts);
-}
-
-// 把 8 个 16 位 hextet 严格解析为数值；任一非法段都返回 null，避免静默丢弃。
-function parseHextets(parts) {
-  const bytes = new Array(8);
-  for (let index = 0; index < 8; index += 1) {
-    const value = parseInt(parts[index] || '0', 16);
-    if (!Number.isFinite(value) || value < 0 || value > 0xffff) return null;
-    bytes[index] = value;
-  }
-  return bytes;
-}
-
-function cidrContainsIpv4(cidr, ipInt) {
-  const [base, prefix] = cidr.split('/');
-  const baseInt = ipv4ToInt(base);
-  if (baseInt === null || ipInt === null) return false;
-  const bits = Number(prefix);
-  if (!Number.isInteger(bits) || bits < 0 || bits > 32) return false;
-  const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
-  return (ipInt & mask) === (baseInt & mask);
-}
-
-function isBlockedIpv4(ip) {
-  const int = parseIpv4(ip);
-  if (int === null) return false;
-  return BLOCKED_CIDRS.some((cidr) => cidr.includes('.') && cidrContainsIpv4(cidr, int));
-}
-
-function isBlockedIpv6(ip) {
-  const bytes = ipv6ToBytes(ip);
-  if (bytes === null || bytes.length !== 8) return false;
-  // ::1（回环）
-  if (bytes.every((v, i) => (i < 7 ? v === 0 : v === 1))) return true;
-  // ::ffff:0:0/96（IPv4-mapped）：后 32 位是 IPv4，交给 IPv4 判断。
-  if (bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 0 && bytes[3] === 0 && bytes[4] === 0 && bytes[5] === 0xffff) {
-    const ipv4 = `${bytes[6] >> 8}.${bytes[6] & 0xff}.${bytes[7] >> 8}.${bytes[7] & 0xff}`;
-    return isBlockedIpv4(ipv4);
-  }
-  // fc00::/7（私有 ULA）：首 hextet 高 7 位为 1111110
-  if ((bytes[0] & 0xfe00) === 0xfc00) return true;
-  // fe80::/10（链路本地）：首 hextet 高 10 位为 1111111010
-  if ((bytes[0] & 0xffc0) === 0xfe80) return true;
-  return false;
-}
-
-function isBlockedIp(ip) {
-  if (ip.includes(':')) return isBlockedIpv6(ip);
-  return isBlockedIpv4(ip);
-}
-
 /**
  * 校验订阅 URL 的目标地址，阻止 SSRF：拒绝回环、私有、链路本地、
  * 保留及云元数据地址，并解析主机名以防御 DNS rebinding。
  */
 async function assertSafeTarget(url) {
   const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  if (host === '' || BLOCKED_HOSTS.has(host)) {
+  if (host === '' || isBlockedHostname(host)) {
     throw new Error('订阅地址指向禁止访问的内部地址');
   }
   // 若主机名本身就是 IP 字面量，直接判定。
