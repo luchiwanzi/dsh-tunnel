@@ -32,7 +32,6 @@ import {
   writeConfig,
 } from './lib/mihomo.js';
 
-const NS = 'dsh-tunnel';
 const API_PATH = '/dsh-tunnel/api';
 const STATE_PATH = path.join(DATA_DIR, 'state.json');
 const MAX_SUBSCRIPTION_BYTES = 6 * 1024 * 1024;
@@ -1036,6 +1035,17 @@ async function readCapped(response, maxBytes, label) {
     decoder = new TextDecoder();
   }
   return decoder.decode(Buffer.concat(chunks));
+}
+
+/** Resolve after `ms` at the latest, so a stuck teardown cannot block shutdown. */
+function withTimeout(promise, ms) {
+  let timer = null;
+  const expiry = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  return Promise.race([Promise.resolve(promise).catch(() => null), expiry]).finally(() => {
+    if (timer !== null) clearTimeout(timer);
+  });
 }
 
 function errorMessage(error) {

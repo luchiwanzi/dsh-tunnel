@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Subscription-driven outbound proxy for DeepSeek Harness: a local mihomo core, a settings page, and Harness-scoped network routing.",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test \"test/**/*.test.js\"",
     "lint": "eslint ."
   },
   "exports": {
