@@ -1,4 +1,4 @@
-#  dsh-tunnel
+# DSH VPN · 外网连接
 
 **面向部署在国内云服务器上的 DeepSeek Harness，解决因服务器出站网络受限，导致国外大模型接口无法连接、请求超时的痛点。**
 
@@ -30,7 +30,7 @@ DSH 页面能打开，不代表服务器能访问模型接口；你电脑上的�
 dsh plugin --profile web add 'git+https://github.com/luchiwanzi/dsh-tunnel.git'
 ```
 
-仓库已公开，无需登录 GitHub。使用自定义 profile 时，将 `web` 替换为实际名称。
+仓库为私密仓库，安装前需先完成 GitHub 认证（如 `gh auth login` 或配置 HTTPS 凭据）。使用自定义 profile 时，将 `web` 替换为实际名称。
 
 安装后刷新 DSH 页面，在 **设置 → 外网连接** 中使用。若未出现，重启 DSH。
 
@@ -45,7 +45,7 @@ git+https://github.com/luchiwanzi/dsh-tunnel.git
 ### 卸载
 
 ```bash
-dsh plugin --profile web remove @deepseek-ai/dsh-tunnel
+dsh plugin --profile web remove @local/dsh-tunnel
 ```
 
 卸载前建议先断开连接；需要保留订阅配置时，请提前妥善备份运行数据。
@@ -144,9 +144,3 @@ node --check lib/mihomo.js
 ```
 
 Host 端使用原生 ESM；Client 端采用延迟执行的 `window.__ModuleLoader__` 工厂，并仅从浏览器模块表导入 `react`。
-
-## 许可证
-
-本插件源码采用 **MIT** 许可证，详见 [LICENSE](./LICENSE)。
-
-> 说明：插件内置的 [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) 内核使用 **GPL-3.0-or-later** 许可证。插件源码与内核分开分发，插件的 MIT 许可证声明不改变内核自身的 GPL 许可证。
