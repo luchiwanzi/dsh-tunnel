@@ -116,7 +116,7 @@ dsh plugin --profile web remove @local/dsh-tunnel
 若对应平台包不可用，插件会尝试从 GitHub 下载固定版本的 Linux 内核，并校验其 SHA256 校验和后再执行。也可通过环境变量指定已安装的 mihomo：
 
 ```bash
-export DSH_VPN_CORE_PATH=/absolute/path/to/mihomo
+export DSH_TUNNEL_CORE_PATH=/absolute/path/to/mihomo
 ```
 
 请在启动 DSH 前设置该变量。默认内核方案面向 Linux；其他系统可能需要自行提供适配平台的 mihomo，兼容性需另行验证。

@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@deepseek-ai/dsh-tunnel',
+  id: '@local/dsh-tunnel',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -183,97 +183,97 @@ window.__ModuleLoader__.load({
     };
 
     const CSS = `
-.dshvpn-root{max-width:820px;margin:0 auto;padding:18px 2px 48px;color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.5}
-.dshvpn-root *{box-sizing:border-box}
-.dshvpn-head{display:flex;align-items:flex-start;gap:14px;margin:0 0 18px}
-.dshvpn-mark{width:46px;height:46px;flex:none;display:grid;place-items:center;border-radius:14px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1)}
-.dshvpn-head-copy{min-width:0;flex:1}
-.dshvpn-title{margin:0;font-size:20px;line-height:1.25;font-weight:650;letter-spacing:-.01em}
-.dshvpn-subtitle{margin:5px 0 0;color:var(--dsw-alias-label-secondary);max-width:620px}
-.dshvpn-badge{flex:none;display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:600;white-space:nowrap}
-.dshvpn-dot{width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-state-idle-primary)}
-.dshvpn-badge.on{color:var(--dsw-alias-state-success-primary);border-color:var(--dsw-alias-state-success-primary)}
-.dshvpn-badge.on .dshvpn-dot{background:var(--dsw-alias-state-success-primary)}
-.dshvpn-badge.busy{color:var(--dsw-alias-state-warn-primary);border-color:var(--dsw-alias-state-warn-primary)}
-.dshvpn-badge.busy .dshvpn-dot{background:var(--dsw-alias-state-warn-primary);animation:dshvpn-pulse 1.2s ease-in-out infinite}
-.dshvpn-badge.error{color:var(--dsw-alias-state-error-primary);border-color:var(--dsw-alias-state-error-primary)}
-.dshvpn-badge.error .dshvpn-dot{background:var(--dsw-alias-state-error-primary)}
-@keyframes dshvpn-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
-.dshvpn-card{background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:14px;padding:18px;margin-top:14px}
-.dshvpn-hero{display:flex;gap:18px;align-items:stretch;justify-content:space-between;background:var(--dsw-alias-bg-layer-1)}
-.dshvpn-hero-copy{min-width:0;flex:1}
-.dshvpn-eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dsw-alias-label-secondary)}
-.dshvpn-hero-line{display:flex;align-items:center;gap:9px;margin-top:7px;font-size:18px;font-weight:650;letter-spacing:-.01em}
-.dshvpn-orb{width:10px;height:10px;border-radius:50%;background:var(--dsw-alias-state-idle-primary);flex:none}
-.dshvpn-orb.on{background:var(--dsw-alias-state-success-primary)}
-.dshvpn-orb.busy{background:var(--dsw-alias-state-warn-primary);animation:dshvpn-pulse 1.2s ease-in-out infinite}
-.dshvpn-orb.error{background:var(--dsw-alias-state-error-primary)}
-.dshvpn-muted{margin:6px 0 0;color:var(--dsw-alias-label-secondary)}
-.dshvpn-facts{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:16px}
-.dshvpn-fact{min-width:110px}
-.dshvpn-fact-label{font-size:11px;color:var(--dsw-alias-label-secondary);margin-bottom:2px}
-.dshvpn-fact-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
-.dshvpn-hero-actions{display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:132px}
-.dshvpn-btn{appearance:none;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);height:36px;padding:0 14px;border-radius:10px;font:inherit;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:background .15s ease,border-color .15s ease,opacity .15s ease}
-.dshvpn-btn:hover:not(:disabled){background:var(--dsw-alias-bg-overlay)}
-.dshvpn-btn:disabled{opacity:1;cursor:not-allowed;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-2)}
-.dshvpn-root .dshvpn-btn.primary{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary)}
-.dshvpn-root .dshvpn-btn.primary:hover:not(:disabled){background:var(--dsw-alias-bg-overlay)}
-.dshvpn-root .dshvpn-btn.primary:disabled{color:var(--dsw-alias-label-secondary);border-color:var(--dsw-alias-border-l2)}
-.dshvpn-root .dshvpn-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-.dshvpn-btn.danger{color:var(--dsw-alias-state-error-primary);border-color:var(--dsw-alias-state-error-primary);background:transparent}
-.dshvpn-btn.danger:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}
-.dshvpn-btn.link{height:auto;padding:0;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-weight:500}
-.dshvpn-btn.link:hover:not(:disabled){color:var(--dsw-alias-label-primary);background:transparent}
-.dshvpn-card-head{display:flex;align-items:flex-start;gap:14px;justify-content:space-between;margin-bottom:12px}
-.dshvpn-card-head h2{margin:0;font-size:14px;font-weight:650}
-.dshvpn-card-head p{margin:3px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px}
-.dshvpn-inputrow{display:flex;gap:8px;align-items:center}
-.dshvpn-input{flex:1;min-width:0;height:38px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);padding:0 12px;font:inherit;outline:none}
-.dshvpn-input::placeholder{color:var(--dsw-alias-label-secondary)}
-.dshvpn-input:focus{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}
-.dshvpn-input:disabled{opacity:.6}
-.dshvpn-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-top:10px;color:var(--dsw-alias-label-secondary);font-size:12px}
-.dshvpn-meta b{color:var(--dsw-alias-label-primary);font-weight:600}
-.dshvpn-warn{margin:10px 0 0;padding:8px 10px;border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-state-warn-primary);font-size:12px}
-.dshvpn-list{margin-top:10px;max-height:310px;overflow:auto;border-top:1px solid var(--dsw-alias-border-l1);padding-top:6px}
-.dshvpn-node{width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;text-align:left;cursor:pointer}
-.dshvpn-node:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}
-.dshvpn-node:disabled{opacity:.6;cursor:not-allowed}
-.dshvpn-node.selected{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
-.dshvpn-radio{width:14px;height:14px;flex:none;border-radius:50%;border:1.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base)}
-.dshvpn-node.selected .dshvpn-radio{border-color:var(--dsw-alias-brand-primary);box-shadow:inset 0 0 0 3px var(--dsw-alias-brand-primary)}
-.dshvpn-node-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
-.dshvpn-type{flex:none;font-size:10px;line-height:1;padding:4px 6px;border-radius:6px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);text-transform:uppercase;letter-spacing:.03em}
-.dshvpn-insecure{flex:none;width:16px;height:16px;line-height:16px;text-align:center;font-size:11px;font-weight:700;border-radius:50%;color:#fff;background:var(--dsw-alias-state-warning-primary,#d97706);cursor:help}
-.dshvpn-delay{flex:none;width:56px;text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--dsw-alias-label-secondary)}
-.dshvpn-delay.good{color:var(--dsw-alias-state-success-primary)}
-.dshvpn-delay.warn{color:var(--dsw-alias-state-warn-primary)}
-.dshvpn-delay.bad{color:var(--dsw-alias-state-error-primary)}
-.dshvpn-empty{border:1px dashed var(--dsw-alias-border-l2);border-radius:12px;padding:20px;text-align:center;margin-top:8px}
-.dshvpn-empty strong{display:block;font-size:13px;margin-bottom:4px}
-.dshvpn-empty p{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px}
-.dshvpn-steps{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;color:var(--dsw-alias-label-secondary);font-size:12px}
-.dshvpn-step{display:inline-flex;align-items:center;gap:6px}
-.dshvpn-step i{display:grid;place-items:center;width:17px;height:17px;border-radius:50%;border:1px solid var(--dsw-alias-border-l2);font-style:normal;font-size:10px;color:var(--dsw-alias-label-secondary)}
-.dshvpn-alert{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;margin-top:12px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);font-size:12px}
-.dshvpn-alert.error{border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}
-.dshvpn-alert.notice{border-color:var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary)}
-.dshvpn-alert span{flex:1;min-width:0;overflow-wrap:anywhere}
-.dshvpn-alert button{appearance:none;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;opacity:.7;padding:0}
-.dshvpn-scope{display:flex;gap:12px;margin-top:18px;padding:14px 4px 0;border-top:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);font-size:12px}
-.dshvpn-scope svg{flex:none;margin-top:1px}
-.dshvpn-scope strong{display:block;color:var(--dsw-alias-label-primary);margin-bottom:3px;font-size:12px}
-.dshvpn-scope p{margin:0 0 4px}
-.dshvpn-loading{display:flex;align-items:center;justify-content:center;min-height:220px;color:var(--dsw-alias-label-secondary)}
-.dshvpn-sep{height:1px;background:var(--dsw-alias-border-l1);margin:12px 0}
+.dshtunnel-root{max-width:820px;margin:0 auto;padding:18px 2px 48px;color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.5}
+.dshtunnel-root *{box-sizing:border-box}
+.dshtunnel-head{display:flex;align-items:flex-start;gap:14px;margin:0 0 18px}
+.dshtunnel-mark{width:46px;height:46px;flex:none;display:grid;place-items:center;border-radius:14px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1)}
+.dshtunnel-head-copy{min-width:0;flex:1}
+.dshtunnel-title{margin:0;font-size:20px;line-height:1.25;font-weight:650;letter-spacing:-.01em}
+.dshtunnel-subtitle{margin:5px 0 0;color:var(--dsw-alias-label-secondary);max-width:620px}
+.dshtunnel-badge{flex:none;display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:600;white-space:nowrap}
+.dshtunnel-dot{width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-state-idle-primary)}
+.dshtunnel-badge.on{color:var(--dsw-alias-state-success-primary);border-color:var(--dsw-alias-state-success-primary)}
+.dshtunnel-badge.on .dshtunnel-dot{background:var(--dsw-alias-state-success-primary)}
+.dshtunnel-badge.busy{color:var(--dsw-alias-state-warn-primary);border-color:var(--dsw-alias-state-warn-primary)}
+.dshtunnel-badge.busy .dshtunnel-dot{background:var(--dsw-alias-state-warn-primary);animation:dshtunnel-pulse 1.2s ease-in-out infinite}
+.dshtunnel-badge.error{color:var(--dsw-alias-state-error-primary);border-color:var(--dsw-alias-state-error-primary)}
+.dshtunnel-badge.error .dshtunnel-dot{background:var(--dsw-alias-state-error-primary)}
+@keyframes dshtunnel-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
+.dshtunnel-card{background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:14px;padding:18px;margin-top:14px}
+.dshtunnel-hero{display:flex;gap:18px;align-items:stretch;justify-content:space-between;background:var(--dsw-alias-bg-layer-1)}
+.dshtunnel-hero-copy{min-width:0;flex:1}
+.dshtunnel-eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dsw-alias-label-secondary)}
+.dshtunnel-hero-line{display:flex;align-items:center;gap:9px;margin-top:7px;font-size:18px;font-weight:650;letter-spacing:-.01em}
+.dshtunnel-orb{width:10px;height:10px;border-radius:50%;background:var(--dsw-alias-state-idle-primary);flex:none}
+.dshtunnel-orb.on{background:var(--dsw-alias-state-success-primary)}
+.dshtunnel-orb.busy{background:var(--dsw-alias-state-warn-primary);animation:dshtunnel-pulse 1.2s ease-in-out infinite}
+.dshtunnel-orb.error{background:var(--dsw-alias-state-error-primary)}
+.dshtunnel-muted{margin:6px 0 0;color:var(--dsw-alias-label-secondary)}
+.dshtunnel-facts{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:16px}
+.dshtunnel-fact{min-width:110px}
+.dshtunnel-fact-label{font-size:11px;color:var(--dsw-alias-label-secondary);margin-bottom:2px}
+.dshtunnel-fact-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.dshtunnel-hero-actions{display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:132px}
+.dshtunnel-btn{appearance:none;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);height:36px;padding:0 14px;border-radius:10px;font:inherit;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:background .15s ease,border-color .15s ease,opacity .15s ease}
+.dshtunnel-btn:hover:not(:disabled){background:var(--dsw-alias-bg-overlay)}
+.dshtunnel-btn:disabled{opacity:1;cursor:not-allowed;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-2)}
+.dshtunnel-root .dshtunnel-btn.primary{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary)}
+.dshtunnel-root .dshtunnel-btn.primary:hover:not(:disabled){background:var(--dsw-alias-bg-overlay)}
+.dshtunnel-root .dshtunnel-btn.primary:disabled{color:var(--dsw-alias-label-secondary);border-color:var(--dsw-alias-border-l2)}
+.dshtunnel-root .dshtunnel-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.dshtunnel-btn.danger{color:var(--dsw-alias-state-error-primary);border-color:var(--dsw-alias-state-error-primary);background:transparent}
+.dshtunnel-btn.danger:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}
+.dshtunnel-btn.link{height:auto;padding:0;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-weight:500}
+.dshtunnel-btn.link:hover:not(:disabled){color:var(--dsw-alias-label-primary);background:transparent}
+.dshtunnel-card-head{display:flex;align-items:flex-start;gap:14px;justify-content:space-between;margin-bottom:12px}
+.dshtunnel-card-head h2{margin:0;font-size:14px;font-weight:650}
+.dshtunnel-card-head p{margin:3px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px}
+.dshtunnel-inputrow{display:flex;gap:8px;align-items:center}
+.dshtunnel-input{flex:1;min-width:0;height:38px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);padding:0 12px;font:inherit;outline:none}
+.dshtunnel-input::placeholder{color:var(--dsw-alias-label-secondary)}
+.dshtunnel-input:focus{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}
+.dshtunnel-input:disabled{opacity:.6}
+.dshtunnel-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-top:10px;color:var(--dsw-alias-label-secondary);font-size:12px}
+.dshtunnel-meta b{color:var(--dsw-alias-label-primary);font-weight:600}
+.dshtunnel-warn{margin:10px 0 0;padding:8px 10px;border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-state-warn-primary);font-size:12px}
+.dshtunnel-list{margin-top:10px;max-height:310px;overflow:auto;border-top:1px solid var(--dsw-alias-border-l1);padding-top:6px}
+.dshtunnel-node{width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;text-align:left;cursor:pointer}
+.dshtunnel-node:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}
+.dshtunnel-node:disabled{opacity:.6;cursor:not-allowed}
+.dshtunnel-node.selected{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
+.dshtunnel-radio{width:14px;height:14px;flex:none;border-radius:50%;border:1.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base)}
+.dshtunnel-node.selected .dshtunnel-radio{border-color:var(--dsw-alias-brand-primary);box-shadow:inset 0 0 0 3px var(--dsw-alias-brand-primary)}
+.dshtunnel-node-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+.dshtunnel-type{flex:none;font-size:10px;line-height:1;padding:4px 6px;border-radius:6px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);text-transform:uppercase;letter-spacing:.03em}
+.dshtunnel-insecure{flex:none;width:16px;height:16px;line-height:16px;text-align:center;font-size:11px;font-weight:700;border-radius:50%;color:#fff;background:var(--dsw-alias-state-warning-primary,#d97706);cursor:help}
+.dshtunnel-delay{flex:none;width:56px;text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--dsw-alias-label-secondary)}
+.dshtunnel-delay.good{color:var(--dsw-alias-state-success-primary)}
+.dshtunnel-delay.warn{color:var(--dsw-alias-state-warn-primary)}
+.dshtunnel-delay.bad{color:var(--dsw-alias-state-error-primary)}
+.dshtunnel-empty{border:1px dashed var(--dsw-alias-border-l2);border-radius:12px;padding:20px;text-align:center;margin-top:8px}
+.dshtunnel-empty strong{display:block;font-size:13px;margin-bottom:4px}
+.dshtunnel-empty p{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px}
+.dshtunnel-steps{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;color:var(--dsw-alias-label-secondary);font-size:12px}
+.dshtunnel-step{display:inline-flex;align-items:center;gap:6px}
+.dshtunnel-step i{display:grid;place-items:center;width:17px;height:17px;border-radius:50%;border:1px solid var(--dsw-alias-border-l2);font-style:normal;font-size:10px;color:var(--dsw-alias-label-secondary)}
+.dshtunnel-alert{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;margin-top:12px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);font-size:12px}
+.dshtunnel-alert.error{border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}
+.dshtunnel-alert.notice{border-color:var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary)}
+.dshtunnel-alert span{flex:1;min-width:0;overflow-wrap:anywhere}
+.dshtunnel-alert button{appearance:none;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;opacity:.7;padding:0}
+.dshtunnel-scope{display:flex;gap:12px;margin-top:18px;padding:14px 4px 0;border-top:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);font-size:12px}
+.dshtunnel-scope svg{flex:none;margin-top:1px}
+.dshtunnel-scope strong{display:block;color:var(--dsw-alias-label-primary);margin-bottom:3px;font-size:12px}
+.dshtunnel-scope p{margin:0 0 4px}
+.dshtunnel-loading{display:flex;align-items:center;justify-content:center;min-height:220px;color:var(--dsw-alias-label-secondary)}
+.dshtunnel-sep{height:1px;background:var(--dsw-alias-border-l1);margin:12px 0}
 @media (max-width:640px){
-  .dshvpn-hero{flex-direction:column}
-  .dshvpn-hero-actions{flex-direction:row;min-width:0}
-  .dshvpn-hero-actions .dshvpn-btn{flex:1}
-  .dshvpn-inputrow{flex-direction:column;align-items:stretch}
-  .dshvpn-inputrow .dshvpn-btn{width:100%}
-  .dshvpn-facts{gap:10px 16px}
+  .dshtunnel-hero{flex-direction:column}
+  .dshtunnel-hero-actions{flex-direction:row;min-width:0}
+  .dshtunnel-hero-actions .dshtunnel-btn{flex:1}
+  .dshtunnel-inputrow{flex-direction:column;align-items:stretch}
+  .dshtunnel-inputrow .dshtunnel-btn{width:100%}
+  .dshtunnel-facts{gap:10px 16px}
 }
 `;
 
@@ -327,9 +327,9 @@ window.__ModuleLoader__.load({
     function Fact({ label, value }) {
       return h(
         'div',
-        { className: 'dshvpn-fact' },
-        h('div', { className: 'dshvpn-fact-label' }, label),
-        h('div', { className: 'dshvpn-fact-value', title: value }, value),
+        { className: 'dshtunnel-fact' },
+        h('div', { className: 'dshtunnel-fact-label' }, label),
+        h('div', { className: 'dshtunnel-fact-value', title: value }, value),
       );
     }
 
@@ -533,10 +533,10 @@ window.__ModuleLoader__.load({
         return `${value} ms`;
       }
 
-      const shell = (children) => h('div', { className: 'dshvpn-root' }, h('style', { key: 'style' }, CSS), children);
+      const shell = (children) => h('div', { className: 'dshtunnel-root' }, h('style', { key: 'style' }, CSS), children);
 
       if (snapshot === null) {
-        return shell(h('div', { className: 'dshvpn-loading' }, error || t('loading')));
+        return shell(h('div', { className: 'dshtunnel-loading' }, error || t('loading')));
       }
 
       const userinfo = snapshot.subscription.userinfo;
@@ -550,28 +550,28 @@ window.__ModuleLoader__.load({
       return shell([
         h(
           'div',
-          { className: 'dshvpn-head', key: 'head' },
-          h('div', { className: 'dshvpn-mark' }, h(ToneIcon)),
+          { className: 'dshtunnel-head', key: 'head' },
+          h('div', { className: 'dshtunnel-mark' }, h(ToneIcon)),
           h(
             'div',
-            { className: 'dshvpn-head-copy' },
-            h('h1', { className: 'dshvpn-title' }, t('title')),
-            h('p', { className: 'dshvpn-subtitle' }, t('subtitle')),
+            { className: 'dshtunnel-head-copy' },
+            h('h1', { className: 'dshtunnel-title' }, t('title')),
+            h('p', { className: 'dshtunnel-subtitle' }, t('subtitle')),
           ),
-          h('span', { className: `dshvpn-badge ${tone}` }, h('span', { className: 'dshvpn-dot' }), badge),
+          h('span', { className: `dshtunnel-badge ${tone}` }, h('span', { className: 'dshtunnel-dot' }), badge),
         ),
 
         h(
           'section',
-          { className: 'dshvpn-card dshvpn-hero', key: 'hero' },
+          { className: 'dshtunnel-card dshtunnel-hero', key: 'hero' },
           h(
             'div',
-            { className: 'dshvpn-hero-copy' },
-            h('div', { className: 'dshvpn-eyebrow' }, t('connection')),
-            h('div', { className: 'dshvpn-hero-line' }, h('span', { className: `dshvpn-orb ${tone}` }), status),
+            { className: 'dshtunnel-hero-copy' },
+            h('div', { className: 'dshtunnel-eyebrow' }, t('connection')),
+            h('div', { className: 'dshtunnel-hero-line' }, h('span', { className: `dshtunnel-orb ${tone}` }), status),
             h(
               'p',
-              { className: 'dshvpn-muted' },
+              { className: 'dshtunnel-muted' },
               connected
                 ? t('proxyHint')
                 : phase === 'error' && snapshot.lastError
@@ -582,7 +582,7 @@ window.__ModuleLoader__.load({
             ),
             h(
               'div',
-              { className: 'dshvpn-facts' },
+              { className: 'dshtunnel-facts' },
               h(Fact, { key: 'endpoint', label: t('endpoint'), value: connected && snapshot.port ? `127.0.0.1:${snapshot.port}` : '—' }),
               h(Fact, { key: 'exit', label: t('exitIp'), value: snapshot.exitIp || '—' }),
               h(Fact, { key: 'core', label: t('coreVersion'), value: snapshot.coreVersion || '—' }),
@@ -590,18 +590,18 @@ window.__ModuleLoader__.load({
           ),
           h(
             'div',
-            { className: 'dshvpn-hero-actions' },
+            { className: 'dshtunnel-hero-actions' },
             connected
               ? h(
                   'button',
-                  { type: 'button', className: 'dshvpn-btn danger', disabled: working, onClick: disconnect },
+                  { type: 'button', className: 'dshtunnel-btn danger', disabled: working, onClick: disconnect },
                   busy === 'disconnect' ? t('stopping') : t('disconnect'),
                 )
               : h(
                   'button',
                   {
                     type: 'button',
-                    className: 'dshvpn-btn primary',
+                    className: 'dshtunnel-btn primary',
                     disabled: working || nodes.length === 0,
                     onClick: connect,
                   },
@@ -609,7 +609,7 @@ window.__ModuleLoader__.load({
                 ),
             h(
               'button',
-              { type: 'button', className: 'dshvpn-btn', disabled: working || !connected, onClick: testExit },
+              { type: 'button', className: 'dshtunnel-btn', disabled: working || !connected, onClick: testExit },
               busy === 'test' ? t('testingExit') : t('testExit'),
             ),
           ),
@@ -618,7 +618,7 @@ window.__ModuleLoader__.load({
         error
           ? h(
               'div',
-              { className: 'dshvpn-alert error', key: 'error' },
+              { className: 'dshtunnel-alert error', key: 'error' },
               h('span', null, h('b', null, `${t('errorTitle')}: `), error),
               h('button', { type: 'button', onClick: () => setError(''), 'aria-label': t('dismiss') }, '×'),
             )
@@ -626,7 +626,7 @@ window.__ModuleLoader__.load({
         notice
           ? h(
               'div',
-              { className: 'dshvpn-alert notice', key: 'notice' },
+              { className: 'dshtunnel-alert notice', key: 'notice' },
               h('span', null, h('b', null, `${t('noticeTitle')}: `), notice),
               h('button', { type: 'button', onClick: () => setNotice(''), 'aria-label': t('dismiss') }, '×'),
             )
@@ -634,10 +634,10 @@ window.__ModuleLoader__.load({
 
         h(
           'section',
-          { className: 'dshvpn-card', key: 'subscription' },
+          { className: 'dshtunnel-card', key: 'subscription' },
           h(
             'div',
-            { className: 'dshvpn-card-head' },
+            { className: 'dshtunnel-card-head' },
             h(
               'div',
               null,
@@ -648,27 +648,27 @@ window.__ModuleLoader__.load({
           h('div', { style: { display: 'flex', gap: 8, marginBottom: 12 } },
             ...['url', 'yaml'].map((mode) => h('button', {
               key: mode, type: 'button', 'aria-pressed': inputMode === mode,
-              className: `dshvpn-btn${inputMode === mode ? ' primary' : ''}`,
+              className: `dshtunnel-btn${inputMode === mode ? ' primary' : ''}`,
               disabled: working, onClick: () => setInputMode(mode),
             }, t(mode === 'yaml' ? 'yamlMode' : 'urlMode')))),
           inputMode === 'yaml' ? h('div', null,
             h('textarea', {
-              className: 'dshvpn-input', rows: 12,
+              className: 'dshtunnel-input', rows: 12,
               style: { width: '100%', height: 240, padding: 12, resize: 'vertical', fontFamily: 'monospace' },
               'aria-label': t('yamlMode'), placeholder: t('yamlPlaceholder'),
               spellCheck: false, autoComplete: 'off', value: yamlDraft,
               disabled: connected || working, onChange: (event) => setYamlDraft(event.target.value),
             }),
-            h('p', { className: 'dshvpn-muted' }, t('yamlPrivacy')),
-            h('button', { type: 'button', className: 'dshvpn-btn primary',
+            h('p', { className: 'dshtunnel-muted' }, t('yamlPrivacy')),
+            h('button', { type: 'button', className: 'dshtunnel-btn primary',
               style: { marginTop: 10 }, disabled: connected || working || !yamlDraft.trim(),
               onClick: importYaml,
             }, t(busy === 'import' ? 'importing' : 'importYaml')),
           ) : h(
             'div',
-            { className: 'dshvpn-inputrow' },
+            { className: 'dshtunnel-inputrow' },
             h('input', {
-              className: 'dshvpn-input',
+              className: 'dshtunnel-input',
               type: 'url',
               inputMode: 'url',
               autoComplete: 'off',
@@ -685,7 +685,7 @@ window.__ModuleLoader__.load({
               'button',
               {
                 type: 'button',
-                className: 'dshvpn-btn primary',
+                className: 'dshtunnel-btn primary',
                 disabled: connected || working || urlDraft.trim() === '',
                 onClick: saveSubscription,
               },
@@ -694,7 +694,7 @@ window.__ModuleLoader__.load({
           ),
           h(
             'div',
-            { className: 'dshvpn-meta' },
+            { className: 'dshtunnel-meta' },
             h('span', null, h('b', null, String(snapshot.subscription.nodeCount)), ` ${t('nodes')}`),
             snapshot.subscription.updatedAt
               ? h('span', null, `${t('updatedAt')} `, h('b', null, formatDate(snapshot.subscription.updatedAt)))
@@ -704,7 +704,7 @@ window.__ModuleLoader__.load({
             snapshot.subscription.nodeCount > 0 && !connected
               ? h(
                   'button',
-                  { type: 'button', className: 'dshvpn-btn link', disabled: working, onClick: clearSubscription },
+                  { type: 'button', className: 'dshtunnel-btn link', disabled: working, onClick: clearSubscription },
                   t('clearSubscription'),
                 )
               : null,
@@ -712,28 +712,28 @@ window.__ModuleLoader__.load({
           snapshot.subscription.warnings?.length
             ? h(
                 'div',
-                { className: 'dshvpn-warn' },
+                { className: 'dshtunnel-warn' },
                 snapshot.subscription.warnings.map((warning) => h('div', { key: warning }, warning)),
               )
             : null,
           !snapshot.coreAvailable
-            ? h('div', { className: 'dshvpn-meta' }, h('span', null, t('firstRunNote')))
+            ? h('div', { className: 'dshtunnel-meta' }, h('span', null, t('firstRunNote')))
             : null,
         ),
 
         h(
           'section',
-          { className: 'dshvpn-card', key: 'nodes' },
+          { className: 'dshtunnel-card', key: 'nodes' },
           h(
             'div',
-            { className: 'dshvpn-card-head' },
+            { className: 'dshtunnel-card-head' },
             h('div', null, h('h2', null, t('nodeTitle')), h('p', null, t('nodeHint'))),
             nodes.length > 0
               ? h(
                   'button',
                   {
                     type: 'button',
-                    className: 'dshvpn-btn',
+                    className: 'dshtunnel-btn',
                     disabled: working || !connected,
                     onClick: latencyAll,
                   },
@@ -744,14 +744,14 @@ window.__ModuleLoader__.load({
           nodes.length === 0
             ? h(
                 'div',
-                { className: 'dshvpn-empty' },
+                { className: 'dshtunnel-empty' },
                 h('strong', null, t('noNodes')),
                 h('p', null, t('noNodesHint')),
                 h(
                   'div',
-                  { className: 'dshvpn-steps' },
+                  { className: 'dshtunnel-steps' },
                   [t('firstStep'), t('secondStep'), t('thirdStep')].map((label, index) =>
-                    h('span', { className: 'dshvpn-step', key: label }, h('i', null, String(index + 1)), label),
+                    h('span', { className: 'dshtunnel-step', key: label }, h('i', null, String(index + 1)), label),
                   ),
                 ),
               )
@@ -759,7 +759,7 @@ window.__ModuleLoader__.load({
                 'div',
                 null,
                 h('input', {
-                  className: 'dshvpn-input',
+                  className: 'dshtunnel-input',
                   type: 'search',
                   placeholder: t('searchPlaceholder'),
                   value: filter,
@@ -768,29 +768,29 @@ window.__ModuleLoader__.load({
                 }),
                 h(
                   'div',
-                  { className: 'dshvpn-list' },
+                  { className: 'dshtunnel-list' },
                   visibleNodes.map((node) =>
                     h(
                       'button',
                       {
                         type: 'button',
                         key: node.name,
-                        className: `dshvpn-node${node.name === snapshot.selected ? ' selected' : ''}`,
+                        className: `dshtunnel-node${node.name === snapshot.selected ? ' selected' : ''}`,
                         disabled: working,
                         onClick: () => selectNode(node),
                         onDoubleClick: () => latencyOne(node),
                         title: `${node.name} — ${t('selectNode')}`,
                         'aria-pressed': node.name === snapshot.selected,
                       },
-                      h('span', { className: 'dshvpn-radio' }),
-                      h('span', { className: 'dshvpn-node-name' }, node.name),
-                      h('span', { className: 'dshvpn-type' }, node.type),
+                      h('span', { className: 'dshtunnel-radio' }),
+                      h('span', { className: 'dshtunnel-node-name' }, node.name),
+                      h('span', { className: 'dshtunnel-type' }, node.type),
                       node.insecure
-                        ? h('span', { className: 'dshvpn-insecure', title: t('insecureNode') }, '!')
+                        ? h('span', { className: 'dshtunnel-insecure', title: t('insecureNode') }, '!')
                         : null,
                       h(
                         'span',
-                        { className: `dshvpn-delay ${delayClass(delays[node.name])}` },
+                        { className: `dshtunnel-delay ${delayClass(delays[node.name])}` },
                         busy === `latency:${node.name}` ? '…' : renderDelay(node.name),
                       ),
                     ),
@@ -801,7 +801,7 @@ window.__ModuleLoader__.load({
 
         h(
           'div',
-          { className: 'dshvpn-scope', key: 'scope' },
+          { className: 'dshtunnel-scope', key: 'scope' },
           h(
             'svg',
             { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true },
