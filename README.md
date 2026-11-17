@@ -144,3 +144,9 @@ node --check lib/mihomo.js
 ```
 
 Host 端使用原生 ESM；Client 端采用延迟执行的 `window.__ModuleLoader__` 工厂，并仅从浏览器模块表导入 `react`。
+
+## 许可证
+
+本插件源码采用 **MIT** 许可证，详见 [LICENSE](./LICENSE)。
+
+> 说明：插件内置的 [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) 内核使用 **GPL-3.0-or-later** 许可证。插件源码与内核分开分发，插件的 MIT 许可证声明不改变内核自身的 GPL 许可证。
