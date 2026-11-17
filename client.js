@@ -93,6 +93,10 @@ window.__ModuleLoader__.load({
       secondStep: 'Choose a node',
       thirdStep: 'Connect and test the exit IP',
       insecureNode: 'Certificate verification disabled',
+      allowInsecure: 'Allow insecure nodes',
+      allowInsecureHint: 'Reject nodes with skip-cert-verify by default (recommended). Enable only if you trust the subscription and accept the man-in-the-middle risk.',
+      allowInsecureOn: 'Insecure nodes are now allowed.',
+      allowInsecureOff: 'Insecure nodes are now rejected.',
     };
 
     const zh = {
@@ -180,6 +184,10 @@ window.__ModuleLoader__.load({
       secondStep: '选择节点',
       thirdStep: '连接并测试出口 IP',
       insecureNode: '未校验证书',
+      allowInsecure: '允许不安全节点',
+      allowInsecureHint: '默认拒绝 skip-cert-verify（关闭证书校验）节点，存在中间人风险。仅在信任该订阅并接受风险时开启。',
+      allowInsecureOn: '已允许不安全节点。',
+      allowInsecureOff: '已拒绝不安全节点。',
     };
 
     const CSS = `
@@ -267,6 +275,10 @@ window.__ModuleLoader__.load({
 .dshtunnel-scope p{margin:0 0 4px}
 .dshtunnel-loading{display:flex;align-items:center;justify-content:center;min-height:220px;color:var(--dsw-alias-label-secondary)}
 .dshtunnel-sep{height:1px;background:var(--dsw-alias-border-l1);margin:12px 0}
+.dshtunnel-allowinsecure{flex-direction:column;align-items:stretch;gap:6px}
+.dshtunnel-switch{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-primary)}
+.dshtunnel-switch input{width:15px;height:15px;accent-color:var(--dsw-alias-brand-primary);cursor:pointer}
+.dshtunnel-switch-label{font-weight:600}
 @media (max-width:640px){
   .dshtunnel-hero{flex-direction:column}
   .dshtunnel-hero-actions{flex-direction:row;min-width:0}
@@ -520,6 +532,15 @@ window.__ModuleLoader__.load({
         }
       }
 
+      async function toggleAllowInsecure(next) {
+        if (connected) {
+          setError(t('updateNeedsDisconnect'));
+          return;
+        }
+        const data = await perform('setAllowInsecure', () => request('setAllowInsecure', { allowInsecure: next }));
+        if (data) setNotice(next ? t('allowInsecureOn') : t('allowInsecureOff'));
+      }
+
       function delayClass(value) {
         if (!Number.isFinite(value)) return '';
         if (value < 350) return 'good';
@@ -708,6 +729,20 @@ window.__ModuleLoader__.load({
                   t('clearSubscription'),
                 )
               : null,
+          ),
+          h(
+            'div',
+            { className: 'dshtunnel-meta dshtunnel-allowinsecure' },
+            h('label', { className: 'dshtunnel-switch' },
+              h('input', {
+                type: 'checkbox',
+                checked: snapshot.subscription.allowInsecure === true,
+                disabled: connected || working,
+                onChange: (event) => toggleAllowInsecure(event.target.checked),
+              }),
+              h('span', { className: 'dshtunnel-switch-label' }, t('allowInsecure')),
+            ),
+            h('span', { className: 'dshtunnel-muted' }, t('allowInsecureHint')),
           ),
           snapshot.subscription.warnings?.length
             ? h(
