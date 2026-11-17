@@ -478,19 +478,22 @@ function ipv6ToBytes(ip) {
     if (zeroCount < 0) return null;
     const parts = [...headParts, ...Array(zeroCount).fill('0'), ...tailParts];
     if (parts.length !== 8) return null;
-    try {
-      return parts.map((p) => parseInt(p || '0', 16)).filter((n) => Number.isFinite(n) && n >= 0 && n <= 0xffff);
-    } catch {
-      return null;
-    }
+    return parseHextets(parts);
   }
   const parts = normalized.split(':');
   if (parts.length !== 8) return null;
-  try {
-    return parts.map((p) => parseInt(p || '0', 16)).filter((n) => Number.isFinite(n) && n >= 0 && n <= 0xffff);
-  } catch {
-    return null;
+  return parseHextets(parts);
+}
+
+// 把 8 个 16 位 hextet 严格解析为数值；任一非法段都返回 null，避免静默丢弃。
+function parseHextets(parts) {
+  const bytes = new Array(8);
+  for (let index = 0; index < 8; index += 1) {
+    const value = parseInt(parts[index] || '0', 16);
+    if (!Number.isFinite(value) || value < 0 || value > 0xffff) return null;
+    bytes[index] = value;
   }
+  return bytes;
 }
 
 function cidrContainsIpv4(cidr, ipInt) {
@@ -512,12 +515,17 @@ function isBlockedIpv4(ip) {
 function isBlockedIpv6(ip) {
   const bytes = ipv6ToBytes(ip);
   if (bytes === null || bytes.length !== 8) return false;
-  // ::1
+  // ::1（回环）
   if (bytes.every((v, i) => (i < 7 ? v === 0 : v === 1))) return true;
-  // fc00::/7
-  if ((bytes[0] & 0xfe) === 0xfc) return true;
-  // fe80::/10
-  if (bytes[0] === 0xfe && (bytes[1] & 0xc0) === 0x80) return true;
+  // ::ffff:0:0/96（IPv4-mapped）：后 32 位是 IPv4，交给 IPv4 判断。
+  if (bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 0 && bytes[3] === 0 && bytes[4] === 0 && bytes[5] === 0xffff) {
+    const ipv4 = `${bytes[6] >> 8}.${bytes[6] & 0xff}.${bytes[7] >> 8}.${bytes[7] & 0xff}`;
+    return isBlockedIpv4(ipv4);
+  }
+  // fc00::/7（私有 ULA）：首 hextet 高 7 位为 1111110
+  if ((bytes[0] & 0xfe00) === 0xfc00) return true;
+  // fe80::/10（链路本地）：首 hextet 高 10 位为 1111111010
+  if ((bytes[0] & 0xffc0) === 0xfe80) return true;
   return false;
 }
 
