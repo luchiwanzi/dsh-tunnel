@@ -27,7 +27,7 @@ DSH 页面能打开，不代表服务器能访问模型接口；你电脑上的�
 在运行 DSH 的机器上执行（需要已安装 Git）：
 
 ```bash
-dsh plugin --profile web add 'git+https://github.com/DimonHo/dsh-tunnel.git'
+dsh plugin --profile web add 'git+https://github.com/luchiwanzi/dsh-tunnel.git'
 ```
 
 仓库已公开，无需登录 GitHub。使用自定义 profile 时，将 `web` 替换为实际名称。
@@ -39,7 +39,7 @@ dsh plugin --profile web add 'git+https://github.com/DimonHo/dsh-tunnel.git'
 打开 **插件管理 → 添加插件**，输入以下 Git 地址并安装：
 
 ```text
-git+https://github.com/DimonHo/dsh-tunnel.git
+git+https://github.com/luchiwanzi/dsh-tunnel.git
 ```
 
 ### 卸载
