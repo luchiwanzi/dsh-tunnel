@@ -45,7 +45,7 @@ git+https://github.com/luchiwanzi/dsh-tunnel.git
 ### 卸载
 
 ```bash
-dsh plugin --profile web remove @local/dsh-tunnel
+dsh plugin --profile web remove @deepseek-ai/dsh-tunnel
 ```
 
 卸载前建议先断开连接；需要保留订阅配置时，请提前妥善备份运行数据。
