@@ -82,7 +82,7 @@ window.__ModuleLoader__.load({
       errorTitle: 'Operation failed',
       noticeTitle: 'Done',
       dismiss: 'Dismiss',
-      loading: 'Reading VPN state…',
+      loading: 'Reading tunnel state…',
       clearNeedsDisconnect: 'Disconnect before removing the subscription.',
       updateNeedsDisconnect: 'Disconnect before updating the subscription.',
       startHint: 'Add a subscription, then connect.',
@@ -169,7 +169,7 @@ window.__ModuleLoader__.load({
       errorTitle: '操作失败',
       noticeTitle: '完成',
       dismiss: '关闭',
-      loading: '正在读取 VPN 状态…',
+      loading: '正在读取隧道状态…',
       clearNeedsDisconnect: '请先断开连接，再删除订阅。',
       updateNeedsDisconnect: '请先断开连接，再更新订阅。',
       startHint: '添加订阅后即可连接。',
@@ -828,7 +828,7 @@ window.__ModuleLoader__.load({
               en,
               zh,
             }),
-          'vpn: dictionaries',
+          'tunnel: dictionaries',
         );
         const t = ctx.locale.bind(NS);
         ctx.effect(
@@ -837,7 +837,7 @@ window.__ModuleLoader__.load({
               ctx.slots.register(
                 {
                   name: 'settings.section',
-                  id: 'vpn-connect',
+                  id: 'tunnel-connect',
                   order: 17,
                   label: () => t('nav'),
                   locale: NS,
@@ -851,7 +851,7 @@ window.__ModuleLoader__.load({
                 Section,
               ),
             ),
-          'vpn: settings section',
+          'tunnel: settings section',
         );
       },
     };
