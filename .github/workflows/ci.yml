@@ -30,6 +30,7 @@ jobs:
           node --check client.js
           node --check lib/subscription.js
           node --check lib/mihomo.js
+          node --check lib/ip.js
 
       - name: Lint
         run: pnpm exec eslint .
