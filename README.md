@@ -108,6 +108,7 @@ dsh plugin --profile web remove @local/dsh-tunnel
 - **内核校验**：从 GitHub 下载备用 mihomo 内核时，会校验压缩包的 SHA256（固定版本），不匹配即中止，防止供应链投毒。
 - **订阅 URL 脱敏**：返回给前端的状态不会暴露订阅链接中的令牌/密码（内嵌凭据会以 `***` 替换）。
 - **证书校验提示**：订阅中声明禁用证书校验（`skip-cert-verify` / `allowInsecure`）的节点会在节点列表中标记 `!` 徽标，提示存在中间人风险。
+- **默认拒绝不安全节点**：默认情况下会过滤掉 `skip-cert-verify` 节点（关闭证书校验，存在中间人嗅探风险）。如需使用这类节点，可在设置页开启「允许不安全节点」开关，开启后需重新导入订阅才会保留这些节点。
 
 ## 内核与平台
 
@@ -120,6 +121,8 @@ export DSH_TUNNEL_CORE_PATH=/absolute/path/to/mihomo
 ```
 
 请在启动 DSH 前设置该变量。默认内核方案面向 Linux；其他系统可能需要自行提供适配平台的 mihomo，兼容性需另行验证。
+
+> **信任边界说明**：只有 Linux AMD64/ARM64 的「从 GitHub 下载回退路径」会对二进制做 SHA256 校验（校验值取自 GitHub release 的 digest）。其他平台（Windows / macOS / Android）的二进制由对应的 npm 包（`@pkgship/mihomo-*`）提供，其信任来自 npm registry 的发布流程，而非 GitHub release 摘要。若对非 Linux 平台的内核供应链有更高要求，建议通过 `DSH_TUNNEL_CORE_PATH` 自行指定经过校验的 mihomo 可执行文件。
 
 mihomo 使用 **GPL-3.0-or-later** 许可证；插件源码与内核分开，插件的许可证声明不会改变内核的许可证。
 
