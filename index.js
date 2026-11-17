@@ -50,6 +50,7 @@ let state = {
   warnings: [],
   userinfo: null,
   hosts: {},
+  allowInsecure: false,
 };
 
 const runtime = {
@@ -110,6 +111,7 @@ export function apply(ctx, config = {}) {
     warnings: [],
     userinfo: null,
     hosts: {},
+    allowInsecure: false,
   };
   shutdownPromise = undefined;
   taskQueue = Promise.resolve();
@@ -244,6 +246,7 @@ async function loadState() {
   state.nodes = Array.isArray(parsed.nodes) ? parsed.nodes.filter(isStoredNode) : [];
   state.hosts = sanitizeHosts(parsed.hosts);
   state.selected = typeof parsed.selected === 'string' ? parsed.selected : '';
+  state.allowInsecure = parsed.allowInsecure === true;
   if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
 }
 
@@ -262,6 +265,7 @@ async function saveState() {
       hosts: state.hosts,
       nodes: state.nodes,
       selected: state.selected,
+      allowInsecure: state.allowInsecure,
     },
     null,
     2,
@@ -325,6 +329,7 @@ function publicState() {
       warnings: state.warnings,
       userinfo: state.userinfo,
       nodeCount: state.nodes.length,
+      allowInsecure: state.allowInsecure,
     },
     nodes: state.nodes.map((node) => ({ name: node.name, type: node.type, insecure: node.insecure === true })),
     selected: state.selected,
@@ -433,6 +438,26 @@ async function dispatch(action, message) {
   if (action === 'test') {
     const result = await testEgress();
     return { ...result, state: publicState() };
+  }
+  if (action === 'setAllowInsecure') {
+    await enqueue(async () => {
+      const next = message.allowInsecure === true;
+      if (next !== state.allowInsecure) {
+        state.allowInsecure = next;
+        // 重新应用过滤：关闭开关时立即过滤掉 insecure 节点。
+        if (next === false) {
+          const insecureCount = state.nodes.filter((node) => node.insecure === true).length;
+          if (insecureCount > 0) {
+            state.nodes = state.nodes.filter((node) => node.insecure !== true);
+            if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
+            state.warnings.push(`已按安全策略过滤 ${insecureCount} 个关闭证书校验的节点`);
+            state.warnings = state.warnings.slice(0, 8);
+          }
+        }
+        await saveState();
+      }
+    });
+    return { state: publicState() };
   }
   throw new Error(`未知操作：${action}`);
 }
@@ -585,9 +610,19 @@ async function applySubscription(result, options) {
   state.nodes = result.nodes;
   state.hosts = result.hosts ?? {};
   state.format = result.format;
-  state.warnings = result.warnings;
+  state.warnings = [...(result.warnings ?? [])];
   state.updatedAt = new Date().toISOString();
   state.userinfo = options.userinfo ?? null;
+  // 默认拒绝 skip-cert-verify 节点（关闭证书校验，存在中间人风险）。
+  // 仅当用户显式开启 allowInsecure 时才保留这类节点。
+  if (state.allowInsecure !== true) {
+    const insecureCount = state.nodes.filter((node) => node.insecure === true).length;
+    if (insecureCount > 0) {
+      state.nodes = state.nodes.filter((node) => node.insecure !== true);
+      state.warnings.push(`已按安全策略过滤 ${insecureCount} 个关闭证书校验的节点，如需使用请在设置中开启「允许不安全节点」`);
+      state.warnings = state.warnings.slice(0, 8);
+    }
+  }
   if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
   runtime.lastError = null;
   await saveState();
@@ -605,6 +640,7 @@ async function clearSubscription() {
     warnings: [],
     userinfo: null,
     hosts: {},
+    allowInsecure: false,
   };
   runtime.lastError = null;
   await removeConfig();
