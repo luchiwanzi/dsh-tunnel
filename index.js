@@ -1042,7 +1042,6 @@ function withTimeout(promise, ms) {
   let timer = null;
   const expiry = new Promise((resolve) => {
     timer = setTimeout(() => resolve(null), ms);
-    if (typeof timer.unref === 'function') timer.unref();
   });
   return Promise.race([Promise.resolve(promise).catch(() => null), expiry]).finally(() => {
     if (timer !== null) clearTimeout(timer);
