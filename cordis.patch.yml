@@ -1,4 +1,4 @@
 - insert:
     - id: dsh-tunnel
-      name: '@local/dsh-tunnel'
+      name: '@deepseek-ai/dsh-tunnel'
       config: {}
