@@ -1,5 +1,5 @@
 {
-  "name": "@deepseek-ai/dsh-tunnel",
+  "name": "dsh-tunnel",
   "version": "1.0.0",
   "private": true,
   "type": "module",

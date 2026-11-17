@@ -30,7 +30,7 @@ DSH 页面能打开，不代表服务器能访问模型接口；你电脑上的�
 dsh plugin --profile web add 'git+https://github.com/luchiwanzi/dsh-tunnel.git'
 ```
 
-仓库为私密仓库，安装前需先完成 GitHub 认证（如 `gh auth login` 或配置 HTTPS 凭据）。使用自定义 profile 时，将 `web` 替换为实际名称。
+使用自定义 profile 时，将 `web` 替换为实际名称。
 
 安装后刷新 DSH 页面，在 **设置 → 外网连接** 中使用。若未出现，重启 DSH。
 
@@ -45,7 +45,7 @@ git+https://github.com/luchiwanzi/dsh-tunnel.git
 ### 卸载
 
 ```bash
-dsh plugin --profile web remove @local/dsh-tunnel
+dsh plugin --profile web remove dsh-tunnel
 ```
 
 卸载前建议先断开连接；需要保留订阅配置时，请提前妥善备份运行数据。
