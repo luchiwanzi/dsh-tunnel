@@ -12,6 +12,7 @@ import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -464,33 +465,28 @@ function ipv4ToInt(ip) {
 }
 
 function parseIpv4(value) {
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
-  return m ? ipv4ToInt(value) : null;
+  if (isIP(value) !== 4) return null;
+  if (value.split('.').some((part) => part.length > 1 && part[0] === '0')) return null;
+  return ipv4ToInt(value);
 }
 
 function ipv6ToBytes(ip) {
+  if (isIP(ip) !== 6) return null;
   const normalized = ip.toLowerCase();
+  let expanded;
   if (normalized.includes('::')) {
     const [head, tail] = normalized.split('::');
     const headParts = head === '' ? [] : head.split(':').filter(Boolean);
     const tailParts = tail === '' ? [] : tail.split(':').filter(Boolean);
     const zeroCount = 8 - headParts.length - tailParts.length;
     if (zeroCount < 0) return null;
-    const parts = [...headParts, ...Array(zeroCount).fill('0'), ...tailParts];
-    if (parts.length !== 8) return null;
-    try {
-      return parts.map((p) => parseInt(p || '0', 16)).filter((n) => Number.isFinite(n) && n >= 0 && n <= 0xffff);
-    } catch {
-      return null;
-    }
+    expanded = [...headParts, ...Array(zeroCount).fill('0'), ...tailParts];
+  } else {
+    expanded = normalized.split(':');
   }
-  const parts = normalized.split(':');
-  if (parts.length !== 8) return null;
-  try {
-    return parts.map((p) => parseInt(p || '0', 16)).filter((n) => Number.isFinite(n) && n >= 0 && n <= 0xffff);
-  } catch {
-    return null;
-  }
+  if (expanded.length !== 8) return null;
+  if (expanded.some((part) => !/^[0-9a-f]{1,4}$/.test(part))) return null;
+  return expanded.map((part) => parseInt(part, 16));
 }
 
 function cidrContainsIpv4(cidr, ipInt) {
@@ -1038,7 +1034,9 @@ function readBody(req, maxBytes) {
       if (settled) return;
       size += chunk.byteLength;
       if (size > maxBytes) {
-        fail(new Error('请求体过大'));
+        const tooLarge = new Error('请求体过大');
+        tooLarge.statusCode = 413;
+        fail(tooLarge);
         req.destroy();
         return;
       }
