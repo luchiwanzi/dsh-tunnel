@@ -73,6 +73,8 @@ const runtime = {
   lastError: null,
   coreHandle: null,
   coreAbort: null,
+  // Aborts the geodata download when the user disconnects mid-connect.
+  connectAbort: null,
   exitState: null,
   proxyDispose: null,
   generation: 0,
@@ -749,6 +751,7 @@ async function connectInternal() {
   if (runtime.proxyDispose !== null || runtime.coreHandle !== null) await teardownRuntime();
 
   runtime.lastError = null;
+  runtime.connectAbort = new AbortController();
   setPhase('preparing');
   try {
     if (state.nodes.length === 0) {
@@ -769,6 +772,7 @@ async function connectInternal() {
         const logger = hostContext?.logger;
         if (logger && typeof logger.info === 'function') logger.info('tunnel: ' + message);
       },
+      signal: runtime.connectAbort?.signal,
     });
     if (runtime.disposed) throw new Error('插件已卸载');
     const cnDirect = missingGeodata.length === 0;
@@ -898,6 +902,12 @@ async function disconnectInternal() {
 async function teardownRuntime() {
   runtime.stopping = true;
   runtime.generation += 1;
+  // A disconnect mid-connect must stop the geodata download in its tracks; the
+  // fetch aborts and ensureGeodata returns its missing list immediately.
+  if (runtime.connectAbort !== null) {
+    runtime.connectAbort.abort();
+    runtime.connectAbort = null;
+  }
   const proxyDispose = runtime.proxyDispose;
   runtime.proxyDispose = null;
   if (proxyDispose !== null) {
@@ -1073,9 +1083,14 @@ const DEFAULT_NO_PROXY = [
   '::1',
   // WorkBuddy bridge upstreams (Tencent). Domestic, and currently unhappy when
   // reached through the core — see the comment above.
-  '.workbuddy.ai',
-  '.codebuddy.cn',
-  '.tencent.com',
+  //
+  // These are exact hostnames, not wildcard suffixes. A leading dot in NO_PROXY
+  // matches the whole domain (".tencent.com" would bypass every Tencent host,
+  // including ones the user may actually want on the tunnel). The bridge only
+  // talks to these three hosts, so naming them exactly keeps the bypass tight.
+  'copilot.tencent.com',
+  'www.codebuddy.cn',
+  'www.workbuddy.ai',
 ];
 
 async function installProxy(port) {
