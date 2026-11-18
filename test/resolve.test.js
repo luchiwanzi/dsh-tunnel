@@ -152,3 +152,76 @@ test('host:8080 之类的串仍会送去解析', async () => {
   // 真正的 IPv4/IPv6 字面量才跳过；含冒号的普通串应进入解析队列。
   assert.deepEqual(seen.sort(), ['foo:bar', 'host:8080']);
 });
+// ============================================================
+// 安全回归：钉入 hosts 的地址必须来自可信的解析结果
+// 威胁模型：地址由插件自身 dns.lookup 产出，订阅方只提供域名。
+// 解析层被污染时，内核可能被指向本机或内网。
+// ============================================================
+
+test('回环 / ULA / 链路本地 / IPv4-mapped 内网地址一律不钉入', async () => {
+  const blocked = {
+    'loopback.example': ['::1'],
+    'ula.example': ['fd12:3456:789a::1'],
+    'linklocal.example': ['fe80::1'],
+    'mapped.example': ['::ffff:127.0.0.1'],
+  };
+  const { hosts, pinned } = await pinIpv6OnlyServers(
+    Object.keys(blocked).map((server) => ({ server })),
+    {},
+    { resolve: fakeResolver(blocked) },
+  );
+  assert.deepEqual(pinned, []);
+  assert.deepEqual(Object.keys(hosts), []);
+});
+
+test('带 zone 标识的链路本地地址同样不钉入', async () => {
+  const { hosts, pinned } = await pinIpv6OnlyServers(
+    [{ server: 'zone.example' }],
+    {},
+    { resolve: fakeResolver({ 'zone.example': ['fe80::1%eth0'] }) },
+  );
+  assert.deepEqual(pinned, []);
+  assert.equal(hosts['zone.example'], undefined);
+});
+
+test('公网 IPv6 仍然正常钉入（安全过滤不误伤功能）', async () => {
+  const { hosts, pinned } = await pinIpv6OnlyServers(
+    [{ server: 'public6.example' }],
+    {},
+    { resolve: fakeResolver({ 'public6.example': ['2001:db8::1'] }) },
+  );
+  assert.equal(hosts['public6.example'], '2001:db8::1');
+  assert.equal(pinned.length, 1);
+});
+
+// ---- 混合应答：安全过滤只影响"挑哪个地址"，不能影响"是否双栈"的判定 ----
+// 否则整条记录被丢弃，本来可用的纯 IPv6 节点反而连不上。
+test('混合应答（内网 IPv6 + 公网 IPv6）挑出公网地址', async () => {
+  const { hosts, pinned } = await pinIpv6OnlyServers(
+    [{ server: 'mixed1.example' }],
+    {},
+    { resolve: fakeResolver({ 'mixed1.example': ['::1', '2606:4700::3333'] }) },
+  );
+  assert.equal(hosts['mixed1.example'], '2606:4700::3333');
+  assert.deepEqual(pinned, [{ server: 'mixed1.example', address: '2606:4700::3333' }]);
+});
+
+test('混合应答（无法解析的串 + 公网 IPv6）挑出公网地址', async () => {
+  const { hosts, pinned } = await pinIpv6OnlyServers(
+    [{ server: 'mixed2.example' }],
+    {},
+    { resolve: fakeResolver({ 'mixed2.example': ['host:8080', '2606:4700::4444'] }) },
+  );
+  assert.equal(hosts['mixed2.example'], '2606:4700::4444');
+  assert.deepEqual(pinned, [{ server: 'mixed2.example', address: '2606:4700::4444' }]);
+});
+
+test('混合应答（真正有 IPv4 答案）不钉入', async () => {
+  const { hosts, pinned } = await pinIpv6OnlyServers(
+    [{ server: 'mixed3.example' }],
+    {},
+    { resolve: fakeResolver({ 'mixed3.example': ['104.16.1.1', '2606:4700::5555'] }) },
+  );
+  assert.deepEqual(pinned, []);
+  assert.equal(hosts['mixed3.example'], undefined);
+});
