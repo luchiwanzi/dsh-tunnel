@@ -17,6 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { parseSubscription, parseUserinfo } from './lib/subscription.js';
 import { isBlockedHostname, isBlockedIp, parseIpv4 } from './lib/ip.js';
+import { describePinned, pinIpv6OnlyServers } from './lib/resolve.js';
 import {
   buildConfig,
   CORE_VERSION,
@@ -36,6 +37,9 @@ const API_PATH = '/dsh-tunnel/api';
 const STATE_PATH = path.join(DATA_DIR, 'state.json');
 const MAX_SUBSCRIPTION_BYTES = 6 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
+
+/** Node URIs pasted straight into the subscription box, one per line. */
+const NODE_URI = /^(?:ss|vmess|trojan|vless|hysteria2|hy2|tuic|socks|socks5|socks5h):\/\//i;
 const EGRESS_URLS = ['https://ifconfig.me/ip', 'https://api.ipify.org?format=json', 'https://ipinfo.io/ip'];
 const DELAY_URL = 'https://www.gstatic.com/generate_204';
 
@@ -547,6 +551,9 @@ async function updateSubscription(rawUrl) {
   const url = rawUrl.trim();
   if (url === '') throw new Error('请输入订阅链接');
   if (url.length > 4096) throw new Error('订阅链接过长');
+  // A node URI (vless://, ss://, …) is a single proxy, not a fetchable URL.
+  // Route it through the local parser so pasting a share link just works.
+  if (NODE_URI.test(url)) return importSubscription(url);
   let parsed;
   try {
     parsed = new URL(url);
@@ -665,8 +672,15 @@ async function connectInternal() {
     if (runtime.disposed) throw new Error('插件已卸载');
     const { mixedPort, apiPort } = await allocatePorts();
     const secret = randomBytes(24).toString('hex');
-    const { text, group } = buildConfig(state.nodes, { mixedPort, apiPort, secret, hosts: state.hosts });
+    const { hosts, pinned } = await resolveProxyServers(state.nodes, state.hosts);
+    if (runtime.disposed) throw new Error('插件已卸载');
+    const { text, group } = buildConfig(state.nodes, { mixedPort, apiPort, secret, hosts });
     await writeConfig(text);
+    const pinNote = describePinned(pinned);
+    if (pinNote !== '') {
+      const logger = hostContext?.logger;
+      if (logger && typeof logger.info === 'function') logger.info('tunnel: ' + pinNote);
+    }
 
     const abort = new AbortController();
     const exitState = { exited: false, detail: '' };
@@ -731,6 +745,25 @@ async function connectInternal() {
     runtime.lastError = message;
     setPhase('error');
     throw error;
+  }
+}
+
+/**
+ * Extend the stored host overrides with a pinned address for every proxy server
+ * that resolves to IPv6 only.
+ */
+async function resolveProxyServers(nodes, storedHosts) {
+  const base = storedHosts !== null && typeof storedHosts === 'object' ? storedHosts : {};
+  try {
+    return await pinIpv6OnlyServers(nodes, base);
+  } catch (error) {
+    // Resolution is best-effort: a failure here must never block connecting.
+    // Still surface it so a regression in the resolver is not silently lost.
+    const logger = hostContext?.logger;
+    if (logger && typeof logger.warn === 'function') {
+      logger.warn('tunnel: 节点 IPv6 解析降级，继续连接：' + errorMessage(error));
+    }
+    return { hosts: { ...base }, pinned: [] };
   }
 }
 
