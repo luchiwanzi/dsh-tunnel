@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
+import { isIP } from 'node:net';
 import { lookup } from 'node:dns/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -24,6 +25,8 @@ import {
   coreFetch,
   DATA_DIR,
   ensureCore,
+  ensureGeodata,
+  geodataStatus,
   allocatePorts,
   readCoreLog,
   removeConfig,
@@ -54,6 +57,7 @@ let state = {
   userinfo: null,
   hosts: {},
   allowInsecure: false,
+  directHosts: [],
 };
 
 const runtime = {
@@ -81,12 +85,17 @@ let httpProxyPromise;
 let shutdownPromise;
 let hostContext;
 let configuredCorePath = '';
+/** Extra hosts/IPs the user wants pinned to DIRECT, from the plugin config. */
+let configuredDirectHosts = [];
 
 export const inject = ['webServer', 'connection', 'subprocess', 'tools'];
 
 export function apply(ctx, config = {}) {
   hostContext = ctx;
   configuredCorePath = typeof config?.corePath === 'string' ? config.corePath : '';
+  configuredDirectHosts = Array.isArray(config?.directHosts)
+    ? config.directHosts.filter((item) => typeof item === 'string' && item.trim() !== '')
+    : [];
   // A module can be re-activated after HMR without re-evaluation. Reset the
   // process-local runtime flags that a previous unload marked as disposed.
   runtime.disposed = false;
@@ -115,6 +124,11 @@ export function apply(ctx, config = {}) {
     userinfo: null,
     hosts: {},
     allowInsecure: false,
+    // Every place that rebuilds `state` has to list this field, or it vanishes
+    // on that reset and the next read throws "not iterable". `loadState` fills
+    // it from disk a moment later; the empty array here is what keeps the shape
+    // valid in between.
+    directHosts: [],
   };
   shutdownPromise = undefined;
   taskQueue = Promise.resolve();
@@ -250,6 +264,9 @@ async function loadState() {
   state.hosts = sanitizeHosts(parsed.hosts);
   state.selected = typeof parsed.selected === 'string' ? parsed.selected : '';
   state.allowInsecure = parsed.allowInsecure === true;
+  state.directHosts = Array.isArray(parsed.directHosts)
+    ? parsed.directHosts.filter((item) => typeof item === 'string' && item.trim() !== '').slice(0, 200)
+    : [];
   if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
 }
 
@@ -269,6 +286,7 @@ async function saveState() {
       nodes: state.nodes,
       selected: state.selected,
       allowInsecure: state.allowInsecure,
+      directHosts: Array.isArray(state.directHosts) ? state.directHosts : [],
     },
     null,
     2,
@@ -304,6 +322,58 @@ function sanitizeUserinfo(value) {
   return Object.keys(result).length === 0 ? null : result;
 }
 
+/**
+ * Accept only entries that can become a valid mihomo rule.
+ *
+ * Shape decides the rule type later (see userDirectRules in lib/mihomo.js), so
+ * this only has to reject what is neither an address nor a hostname. Refusing
+ * here rather than at config build time keeps one bad paste from making the
+ * whole tunnel fail to start.
+ */
+/**
+ * True when `value` is a hostname, an IP literal, or a CIDR block.
+ *
+ * The address test runs through node:net's own parser rather than a character
+ * class. A character-class test accepts anything made of hex digits and dots,
+ * which means "abc123" and "cafe1" pass as addresses and then reach mihomo as
+ * `IP-CIDR,abc123/32` — a rule the core rejects, which takes the whole config
+ * with it and leaves the user with a tunnel that will not start. Measured on
+ * exactly that input before this change.
+ */
+function isDirectEntry(value) {
+  if (value.includes('/')) {
+    const [base, prefix] = value.split('/');
+    // Digits only: Number('abc') is NaN but Number('') is 0, so an integer
+    // check alone would accept `1.2.3.4/` as a /0 rule.
+    if (!/^\d{1,3}$/.test(prefix)) return false;
+    const bits = Number(prefix);
+    const version = isIP(base);
+    if (version === 4) return bits <= 32;
+    if (version === 6) return bits <= 128;
+    return false;
+  }
+  if (isIP(value) !== 0) return true;
+  // A dotted token that is not a legal address ("999.1.1.1") is not a hostname
+  // either, however much it looks like one.
+  if (/^[\d.]+$/.test(value)) return false;
+  return /^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$/.test(value);
+}
+
+function sanitizeDirectHosts(value) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const raw of value) {
+    const item = typeof raw === 'string' ? raw.trim().replace(/^\./, '') : '';
+    if (item === '' || seen.has(item)) continue;
+    if (!isDirectEntry(item)) continue;
+    seen.add(item);
+    out.push(item);
+    if (out.length >= 200) break;
+  }
+  return out;
+}
+
 function sanitizeHosts(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return {};
   const result = {};
@@ -324,6 +394,10 @@ function publicState() {
     lastError: runtime.lastError,
     group: runtime.group,
     coreAvailable: existsSync(resolveCorePath(configuredCorePath)),
+    // Whether the split-rule databases are on disk. The first connect has to
+    // fetch them, which takes tens of seconds; the UI says so instead of
+    // showing an unexplained wait on `preparing`.
+    geodataReady: geodataStatus(),
     subscription: {
       url: maskSubscriptionUrl(state.subscriptionUrl),
       hasSubscription: state.subscriptionUrl !== '',
@@ -336,6 +410,7 @@ function publicState() {
     },
     nodes: state.nodes.map((node) => ({ name: node.name, type: node.type, insecure: node.insecure === true })),
     selected: state.selected,
+    directHosts: Array.isArray(state.directHosts) ? state.directHosts : [],
   };
 }
 
@@ -441,6 +516,17 @@ async function dispatch(action, message) {
   if (action === 'test') {
     const result = await testEgress();
     return { ...result, state: publicState() };
+  }
+  if (action === 'setDirectHosts') {
+    await enqueue(async () => {
+      const previous = Array.isArray(state.directHosts) ? state.directHosts : [];
+      const next = sanitizeDirectHosts(message.directHosts);
+      if (next.join('\n') !== previous.join('\n')) {
+        state.directHosts = next;
+        await saveState();
+      }
+    });
+    return { state: publicState() };
   }
   if (action === 'setAllowInsecure') {
     await enqueue(async () => {
@@ -647,6 +733,9 @@ async function clearSubscription() {
     userinfo: null,
     hosts: {},
     allowInsecure: false,
+    // Removing a subscription clears what came with it, but the direct list is
+    // the user's own setting and is not part of the subscription — it survives.
+    directHosts: Array.isArray(state.directHosts) ? state.directHosts : [],
   };
   runtime.lastError = null;
   await removeConfig();
@@ -670,11 +759,41 @@ async function connectInternal() {
 
     const corePath = await ensureCore(configuredCorePath, () => setPhase('downloading'));
     if (runtime.disposed) throw new Error('插件已卸载');
+
+    // The China-direct rules reference GeoSite.dat and GeoIP.dat. A rule whose
+    // database is missing stops the core from starting at all, so the databases
+    // are provisioned first and the rules are dropped when that fails: a working
+    // tunnel without split routing beats no tunnel.
+    const missingGeodata = await ensureGeodata({
+      log: (message) => {
+        const logger = hostContext?.logger;
+        if (logger && typeof logger.info === 'function') logger.info('tunnel: ' + message);
+      },
+    });
+    if (runtime.disposed) throw new Error('插件已卸载');
+    const cnDirect = missingGeodata.length === 0;
+    if (!cnDirect) {
+      const logger = hostContext?.logger;
+      if (logger && typeof logger.warn === 'function') {
+        logger.warn('tunnel: 分流规则数据库不可用（' + missingGeodata.join('、') + '），已回退为全局代理');
+      }
+    }
+
     const { mixedPort, apiPort } = await allocatePorts();
     const secret = randomBytes(24).toString('hex');
     const { hosts, pinned } = await resolveProxyServers(state.nodes, state.hosts);
     if (runtime.disposed) throw new Error('插件已卸载');
-    const { text, group } = buildConfig(state.nodes, { mixedPort, apiPort, secret, hosts });
+    const { text, group } = buildConfig(state.nodes, {
+      mixedPort,
+      apiPort,
+      secret,
+      hosts,
+      cnDirect,
+      // The config file is for a fixed list the deployment owns; the UI list is
+      // what the person in front of it just typed. Both are honoured, config
+      // first so a value pinned by the deployment is never silently dropped.
+      directHosts: [...configuredDirectHosts, ...(Array.isArray(state.directHosts) ? state.directHosts : [])],
+    });
     await writeConfig(text);
     const pinNote = describePinned(pinned);
     if (pinNote !== '') {
@@ -930,6 +1049,35 @@ async function testEgress() {
   throw new Error(`出口测试失败：${lastError || '没有可用的出口检测服务'}`);
 }
 
+/**
+ * Hosts that must never enter the tunnel, whatever the rule set says.
+ *
+ * A rule of DIRECT inside mihomo still routes the connection through the core:
+ * the request is accepted on the loopback port, the core dials the target
+ * itself. That is fine for latency, but it hands every such request to a
+ * process that is also carrying traffic from a foreign exit node — and at least
+ * one local service rejects requests that arrive through it (the WorkBuddy
+ * bridge returns 502 transport failures only while the tunnel is connected,
+ * even though the same URLs answer normally when fetched directly).
+ *
+ * NO_PROXY is the only mechanism that keeps a request out of the core
+ * entirely, so the domestic services that matter are listed here and are
+ * fetched by the host process itself.
+ *
+ * Values from the environment are appended rather than replaced: a deployment
+ * that already pins its own bypass list keeps it.
+ */
+const DEFAULT_NO_PROXY = [
+  'localhost',
+  '127.0.0.1',
+  '::1',
+  // WorkBuddy bridge upstreams (Tencent). Domestic, and currently unhappy when
+  // reached through the core — see the comment above.
+  '.workbuddy.ai',
+  '.codebuddy.cn',
+  '.tencent.com',
+];
+
 async function installProxy(port) {
   const module = await loadHttpProxy();
   const existingNoProxy = process.env.NO_PROXY || process.env.no_proxy || '';
@@ -937,7 +1085,12 @@ async function installProxy(port) {
     ['http_proxy', `http://127.0.0.1:${port}`],
     ['https_proxy', `http://127.0.0.1:${port}`],
   ]);
-  if (existingNoProxy !== '') values.set('no_proxy', existingNoProxy);
+  // Always set no_proxy: leaving the core in the path for the hosts above is
+  // what breaks them. An environment value is unioned in, not substituted.
+  const bypass = existingNoProxy === ''
+    ? DEFAULT_NO_PROXY
+    : [...DEFAULT_NO_PROXY, ...existingNoProxy.split(',').map((item) => item.trim()).filter(Boolean)];
+  values.set('no_proxy', bypass.join(','));
   const env = {
     get(name) {
       const value = values.get(name);
