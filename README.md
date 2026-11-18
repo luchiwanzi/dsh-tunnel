@@ -134,6 +134,18 @@ mihomo 使用 **GPL-3.0-or-later** 许可证；插件源码与内核分开，插
 - 如果所选节点无法访问 DSH 依赖的服务，连接期间对应请求会失败；断开代理可恢复直连。
 - 管理页面通过 React 插槽集成到现有 DSH Web 界面，不替换应用根节点、不使用 iframe，也不读取其他插件的 DOM。
 
+## 许可证
+
+本插件的源码采用 [MIT 许可证](LICENSE)。
+
+```text
+MIT License
+
+Copyright (c) 2026 luchiwanzi
+```
+
+> 说明：MIT 仅适用于本仓库的插件源码。插件运行时依赖的 [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) 内核采用 **GPL-3.0-or-later** 许可证，二者相互独立，本插件的 MIT 声明不会改变内核的许可证。
+
 ## 来源与致谢
 
 本项目由 [DimonHo/dsh-vpn](https://github.com/DimonHo/dsh-vpn) 删改、重构并重新编译而来，在其基础上进行了安全加固（SSRF 防护、内核 SHA256 校验、订阅凭据脱敏、证书校验风险提示等）与工程修复。特此致谢原作者的贡献。
