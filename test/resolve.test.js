@@ -139,3 +139,16 @@ test('describePinned 文案', () => {
   assert.equal(describePinned(null), '');
   assert.match(describePinned([{ server: 'a.example', address: '2001:db8::1' }]), /a\.example/);
 });
+
+// ---- 含冒号但非 IP 的字符串不应被当作 IP 字面量跳过 ----
+test('host:8080 之类的串仍会送去解析', async () => {
+  const seen = [];
+  const resolve = async (host) => { seen.push(host); return null; };
+  await pinIpv6OnlyServers(
+    [{ server: 'host:8080' }, { server: 'foo:bar' }],
+    {},
+    { resolve },
+  );
+  // 真正的 IPv4/IPv6 字面量才跳过；含冒号的普通串应进入解析队列。
+  assert.deepEqual(seen.sort(), ['foo:bar', 'host:8080']);
+});
