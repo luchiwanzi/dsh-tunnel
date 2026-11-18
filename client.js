@@ -578,31 +578,36 @@ window.__ModuleLoader__.load({
           setError(t('directNeedsDisconnect'));
           return;
         }
-        // Validate here as well as on the host: the host drops what it cannot
-        // turn into a rule, so without this a typo would report success and
-        // then quietly not appear.
-        // Same test the host applies. Kept deliberately strict about the shape
-        // of an address: a looser one lets "abc123" through to the host, which
-        // drops it, and the user sees "added" then nothing.
-        const isAddress =
-          /^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(raw) || /^[0-9a-fA-F:]+\/\d{1,3}$/.test(raw);
-        const isHost = /^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$/.test(raw);
-        if (!isAddress && !isHost) {
-          setError(t('directInvalid'));
-          return;
-        }
         const current = snapshot?.directHosts ?? [];
         if (current.includes(raw)) {
           setError(t('directDuplicate'));
           return;
         }
+        // The host decides what is a valid entry, and the browser does not try
+        // to guess first.
+        //
+        // An earlier version duplicated the test here with its own regex, and
+        // the two drifted apart immediately: "999.1.1.1" and "1.2.3.4/99"
+        // passed the browser and were dropped by the host (the user saw "added"
+        // and nothing appeared), while "2001:db8::1" — a perfectly good bare
+        // IPv6 address — was rejected by the browser before it ever reached the
+        // host. Two implementations of one rule is two chances to be wrong;
+        // keeping the check in one place is what stops it happening again.
+        //
+        // So the request carries the candidate list, the host filters it, and
+        // the reply is the truth. If the entry did not survive, say so instead
+        // of reporting success.
         const data = await perform('direct', () =>
           request('setDirectHosts', { directHosts: [...current, raw] }),
         );
-        if (data) {
-          setDirectDraft('');
-          setNotice(t('directSaved'));
+        if (!data) return;
+        const accepted = data.state?.directHosts ?? [];
+        if (!accepted.includes(raw)) {
+          setError(t('directInvalid'));
+          return;
         }
+        setDirectDraft('');
+        setNotice(t('directSaved'));
       }
 
       async function removeDirectHost(entry) {
