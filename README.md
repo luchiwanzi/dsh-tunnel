@@ -52,7 +52,7 @@ dsh plugin --profile web remove dsh-tunnel
 
 ## 主要功能
 
-- **订阅导入**：支持 Clash / mihomo YAML 订阅，以及 Base64 编码或明文节点链接列表。
+- **订阅导入**：支持 Clash / mihomo YAML 订阅、Base64 编码或明文节点链接列表，以及 v2rayN 的单节点链接（`vless://`、`vmess://`、`ss://`、`trojan://` 等）。
 - **节点切换**：在设置页面选择节点、连接或断开代理。
 - **出口测试**：检查当前公网出口 IP。
 - **DSH 范围代理**：连接后应用 DSH 进程级 HTTP 代理策略，供模型请求、`web_search` / `web_fetch`、MCP 和后续启动的子进程使用。
@@ -71,7 +71,7 @@ dsh plugin --profile web remove dsh-tunnel
 
 ### 直接粘贴配置（无需访问订阅地址）
 
-如果当前网络无法访问订阅地址，可切换到 **粘贴 YAML**，粘贴完整 Clash / mihomo 配置，然后点击 **导入配置**。也支持 Base64 编码或明文节点链接列表。
+如果当前网络无法访问订阅地址，可切换到 **粘贴 YAML**，粘贴完整 Clash / mihomo 配置，然后点击 **导入配置**。也支持 Base64 编码或明文节点链接列表，以及 v2rayN 的单节点链接（`vless://`、`vmess://`、`ss://`、`trojan://` 等）。
 
 - 导入前需先断开连接；配置内容最大为 6 MB。
 - 配置在 DSH 服务端本地解析，不向订阅地址发起请求，并保留节点与 `hosts` 映射。
@@ -83,6 +83,7 @@ dsh plugin --profile web remove dsh-tunnel
 
 - 包含内联 `proxies` 列表的 Clash / Clash.Meta / mihomo YAML 文档。
 - Base64 编码或明文 URI 列表，支持 `ss`、`vmess`、`trojan`、`vless`（含 Reality）、`hysteria2`、`tuic`、`socks5` 和 `http` 节点。
+- v2rayN 的单节点链接（`vless://`、`vmess://`、`ss://`、`trojan://` 等），可直接粘贴到订阅框或「粘贴 YAML」中，在本地解析。
 
 插件不沿用订阅中的代理组和分流规则，而是创建一个固定的 `select` 代理组，通过 `MATCH` 规则代理非本地流量。本地、回环和 RFC1918 私有地址保持直连。
 
