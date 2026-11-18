@@ -95,6 +95,44 @@ test('重复 server 只解析一次', async () => {
   assert.equal(calls, 1);
 });
 
+// ---- 原型键防护 ----
+test('跳过 __proto__ server 名', async () => {
+  const resolve = async () => { throw new Error('不应被调用'); };
+  const { hosts, pinned } = await pinIpv6OnlyServers(
+    [{ server: '__proto__' }],
+    {},
+    { resolve },
+  );
+  assert.deepEqual(pinned, []);
+  assert.deepEqual(Object.keys(hosts), []);
+});
+
+// ---- 畸形解析结果防护 ----
+test('忽略空/未知地址的解析结果', async () => {
+  const resolve = async () => [
+    { address: '' },
+    { address: null },
+    {},
+    { address: '2606:4700::4444' },
+  ];
+  const { hosts, pinned } = await pinIpv6OnlyServers(
+    [{ server: 'v6.example' }],
+    {},
+    { resolve },
+  );
+  assert.equal(hosts['v6.example'], '2606:4700::4444');
+  assert.equal(pinned.length, 1);
+});
+
+// ---- 文案截断 ----
+test('describePinned 截断超长列表', () => {
+  const pinned = Array.from({ length: 10 }, (_, i) => ({ server: 'n' + i + '.example' }));
+  const note = describePinned(pinned);
+  assert.match(note, /n7\.example/);
+  assert.doesNotMatch(note, /n8\.example/);
+  assert.match(note, /等 10 个节点/);
+});
+
 // ---- 描述文案 ----
 test('describePinned 文案', () => {
   assert.equal(describePinned([]), '');
