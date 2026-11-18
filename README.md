@@ -57,6 +57,7 @@ dsh plugin --profile web remove dsh-tunnel
 - **出口测试**：检查当前公网出口 IP。
 - **DSH 范围代理**：连接后应用 DSH 进程级 HTTP 代理策略，供模型请求、`web_search` / `web_fetch`、MCP 和后续启动的子进程使用。
 - **本地监听**：HTTP/SOCKS 混合代理仅绑定 `127.0.0.1` 的随机端口，管理接口复用现有 DSH Web 服务。
+- **纯 IPv6 节点支持**：连接前自动解析各代理服务器域名，将「仅解析出 IPv6 地址」的节点钉进 `hosts`，使只有 AAAA 记录的纯 IPv6 节点也能连接；有 IPv4 答案或解析失败的节点保持原有解析路径，不影响连接。
 - **智能体工具**：提供 `tunnel_connection`，支持查询状态、导入订阅、连接、断开、切换节点和测试出口。
 
 ## 使用方法
@@ -87,7 +88,7 @@ dsh plugin --profile web remove dsh-tunnel
 
 插件不沿用订阅中的代理组和分流规则，而是创建一个固定的 `select` 代理组，通过 `MATCH` 规则代理非本地流量。本地、回环和 RFC1918 私有地址保持直连。
 
-订阅中的 Clash `hosts` 映射会保留，以兼容在节点 `server` 中使用特殊域名、再通过 `hosts` 映射到真实 CDN 地址的订阅。
+订阅中的 Clash `hosts` 映射会保留，以兼容在节点 `server` 中使用特殊域名、再通过 `hosts` 映射到真实 CDN 地址的订阅。连接时插件会额外解析每个代理服务器：对「只返回 IPv6 地址」的纯 IPv6 节点自动固定 AAAA 地址，避免因内核 `ipv6: false` 而无法连接；解析失败会静默降级，绝不阻断连接。
 
 ## 数据与安全
 
