@@ -756,7 +756,13 @@ async function resolveProxyServers(nodes, storedHosts) {
   const base = storedHosts !== null && typeof storedHosts === 'object' ? storedHosts : {};
   try {
     return await pinIpv6OnlyServers(nodes, base);
-  } catch {
+  } catch (error) {
+    // Resolution is best-effort: a failure here must never block connecting.
+    // Still surface it so a regression in the resolver is not silently lost.
+    const logger = hostContext?.logger;
+    if (logger && typeof logger.warn === 'function') {
+      logger.warn('tunnel: 节点 IPv6 解析降级，继续连接：' + errorMessage(error));
+    }
     return { hosts: { ...base }, pinned: [] };
   }
 }
