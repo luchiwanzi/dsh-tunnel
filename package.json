@@ -1,6 +1,6 @@
 {
   "name": "dsh-tunnel",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Subscription-driven outbound proxy for DeepSeek Harness: a local mihomo core, a settings page, and Harness-scoped network routing.",
