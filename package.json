@@ -1,9 +1,29 @@
 {
-  "name": "dsh-tunnel",
-  "version": "1.0.1",
-  "private": true,
+  "name": "@wanziya/dsh-tunnel",
+  "version": "1.1.1",
   "type": "module",
-  "description": "Subscription-driven outbound proxy for DeepSeek Harness: a local mihomo core, a settings page, and Harness-scoped network routing.",
+  "description": "Subscription-driven outbound proxy for the agent runtime: local mihomo core, settings page, China-direct split routing, and Harness-scoped network routing.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "proxy",
+    "tunnel",
+    "mihomo",
+    "clash",
+    "v2ray"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luchiwanzi/dsh-tunnel.git"
+  },
+  "homepage": "https://github.com/luchiwanzi/dsh-tunnel#readme",
+  "bugs": {
+    "url": "https://github.com/luchiwanzi/dsh-tunnel/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "test": "node --test \"test/**/*.test.js\"",
     "lint": "eslint ."

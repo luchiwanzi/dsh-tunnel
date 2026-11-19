@@ -25,7 +25,15 @@
 
 ### 命令行安装
 
-在运行 DSH 的机器上执行（需要已安装 Git）：
+**方式一：从 npm 安装（推荐，版本可控）**
+
+```bash
+dsh plugin --profile <profile> add @wanziya/dsh-tunnel
+```
+
+**方式二：从 GitHub 安装（跟随 main 分支，始终最新）**
+
+需要已安装 Git：
 
 ```bash
 dsh plugin --profile <profile> add 'git+https://github.com/luchiwanzi/dsh-tunnel.git'
@@ -33,17 +41,31 @@ dsh plugin --profile <profile> add 'git+https://github.com/luchiwanzi/dsh-tunnel
 
 `<profile>` 换成你实际使用的 profile 名：桌面版默认是 `desktop`，命令行版默认是 `web`。不确定的话看 `~/.dsh/profiles/` 下的目录名。
 
+> 两种方式的区别：npm 包有固定版本号，适合长期使用；GitHub 方式跟随最新提交，适合跟踪开发进度。两者当前内容一致。
+
 安装后刷新 DSH 页面，在 **设置 → 外网连接** 中使用。若未出现，重启 DSH。
 
 ### 插件管理页面安装
 
-打开 **插件管理 → 添加插件**，输入以下 Git 地址并安装：
+打开 **插件管理 → 添加插件**，输入以下任一地址并安装：
+
+```text
+@wanziya/dsh-tunnel
+```
+
+或
 
 ```text
 git+https://github.com/luchiwanzi/dsh-tunnel.git
 ```
 
 ### 卸载
+
+```bash
+dsh plugin --profile <profile> remove @wanziya/dsh-tunnel
+```
+
+从 GitHub 方式安装的，卸载时用：
 
 ```bash
 dsh plugin --profile <profile> remove dsh-tunnel
@@ -236,5 +258,15 @@ node --check lib/ip.js
 ```
 
 CI（`.github/workflows/ci.yml`）跑的就是上面这套；提交前本地跑一遍即可。
+
+### 发布到 npm
+
+包名 `@wanziya/dsh-tunnel`，发布需要 npm 账号且 token 具有 `publish` 权限（并勾选 Bypass 2FA）：
+
+```bash
+pnpm publish --access public
+```
+
+发布后同步更新 `package.json` 的 `version`，并推回本仓库，保持 npm 与 GitHub 一致。
 
 Host 端使用原生 ESM；Client 端采用延迟执行的 `window.__ModuleLoader__` 工厂，并仅从浏览器模块表导入 `react`。
