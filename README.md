@@ -1,20 +1,21 @@
 # DSH Tunnel · 外网连接
 
-**面向部署在国内云服务器上的 DeepSeek Harness，解决因服务器出站网络受限，导致国外大模型接口无法连接、请求超时的痛点。**
+**为 DeepSeek Harness 提供一条可控的出站网络：让模型请求、联网工具和 MCP 走你选的代理节点，并让国内流量保持直连。**
 
-DSH 页面能打开，不代表服务器能访问模型接口；你电脑上的浏览器能访问国外服务，也不代表云服务器上的 DSH 能访问。模型请求由 **DSH 所在服务器** 发出，因此需要为服务器上的 DSH 配置可用的出站网络。
+模型请求由 **DSH 进程自己** 发出，不是由你浏览器发出。所以「页面能打开」不代表模型接口能连上，「浏览器能访问国外网站」也不代表 DSH 能访问——尤其在国内云服务器上部署时，出站受限是常态。插件把这件事放进 DSH 自己的设置页：不用改系统代理、不动路由表，也不需要给整台机器套全局代理。
 
-本插件将这个配置过程放进 DSH 设置页面：**导入订阅或粘贴 YAML → 选择节点 → 连接 → 测试出口 IP**，让 DSH 通过你提供的代理节点访问国外大模型服务，无需手动修改系统代理或路由表。
+桌面版和云服务器部署都适用。典型流程是 **导入订阅或粘贴 YAML → 选择节点 → 连接 → 测试出口 IP**。
 
 ## 解决什么问题？
 
-| 国内云服务器部署中的常见痛点 | 本插件提供的能力 |
+| 常见痛点 | 本插件提供的能力 |
 |---|---|
 | DSH 已部署成功，但调用 OpenAI、Anthropic 等国外模型接口时连接失败或超时 | 为 DSH 模型请求配置代理出口，解决网络可达性问题。 |
-| 本地电脑能访问国外服务，但服务器上的 DSH 仍然无法连接 | 代理作用于 DSH 服务端，而不是只作用于本地浏览器。 |
-| 不想修改整台服务器的网络配置，影响其他应用 | 仅为 DSH 及其后续启动的子进程提供代理，不修改系统代理、防火墙或路由表。 |
-| 服务器连订阅地址都无法访问，无法拉取节点 | 支持直接粘贴 Clash / mihomo YAML 或节点列表，在服务器本地解析。 |
+| 本地电脑能访问国外服务，但服务器上的 DSH 仍然无法连接 | 代理作用于 DSH 进程本身，而不是只作用于浏览器。 |
+| 不想修改整台机器的网络配置，影响其他应用 | 仅为 DSH 及其后续启动的子进程提供代理，不修改系统代理、防火墙或路由表。 |
+| 连订阅地址都无法访问，无法拉取节点 | 支持直接粘贴 Clash / mihomo YAML 或节点列表，在本地解析。 |
 | 模型可用，但联网搜索、网页抓取等工具仍受网络限制 | 通过 DSH 进程级代理策略覆盖 `web_search` / `web_fetch`、MCP 等支持该策略的请求。 |
+| 全局代理后国内服务也绕道境外，变慢甚至失败 | 国内直连分流：国内流量不经过节点，只有其余流量走代理；覆盖不全时可用直连名单补充。 |
 
 > **能力边界：本插件解决的是网络连接问题，不提供模型账号、API Key、订阅额度或代理节点。** 需要自行准备可用节点和相应模型凭据；实际可用性取决于节点质量、服务商支持地区、账号权限及服务条款，不能保证所有国外模型均可使用。
 >
@@ -27,10 +28,10 @@ DSH 页面能打开，不代表服务器能访问模型接口；你电脑上的�
 在运行 DSH 的机器上执行（需要已安装 Git）：
 
 ```bash
-dsh plugin --profile web add 'git+https://github.com/luchiwanzi/dsh-tunnel.git'
+dsh plugin --profile <profile> add 'git+https://github.com/luchiwanzi/dsh-tunnel.git'
 ```
 
-使用自定义 profile 时，将 `web` 替换为实际名称。
+`<profile>` 换成你实际使用的 profile 名：桌面版默认是 `desktop`，命令行版默认是 `web`。不确定的话看 `~/.dsh/profiles/` 下的目录名。
 
 安装后刷新 DSH 页面，在 **设置 → 外网连接** 中使用。若未出现，重启 DSH。
 
@@ -45,7 +46,7 @@ git+https://github.com/luchiwanzi/dsh-tunnel.git
 ### 卸载
 
 ```bash
-dsh plugin --profile web remove dsh-tunnel
+dsh plugin --profile <profile> remove dsh-tunnel
 ```
 
 卸载前建议先断开连接；需要保留订阅配置时，请提前妥善备份运行数据。
@@ -58,7 +59,7 @@ dsh plugin --profile web remove dsh-tunnel
 - **DSH 范围代理**：连接后应用 DSH 进程级 HTTP 代理策略，供模型请求、`web_search` / `web_fetch`、MCP 和后续启动的子进程使用。
 - **本地监听**：HTTP/SOCKS 混合代理仅绑定 `127.0.0.1` 的随机端口，管理接口复用现有 DSH Web 服务。
 - **纯 IPv6 节点支持**：连接前自动解析各代理服务器域名，将「仅解析出 IPv6 地址」的节点钉进 `hosts`，使只有 AAAA 记录的纯 IPv6 节点也能连接；有 IPv4 答案或解析失败的节点保持原有解析路径，不影响连接。
-- **国内直连分流**：`GEOSITE,cn` 与 `GEOIP,CN` 命中的流量直连，其余流量才走所选节点。规则数据库（`GeoSite.dat` / `GeoIP.dat`，约 27 MB）在首次连接时自动下载，下载失败自动回退为全局代理。
+- **国内直连分流**：`GEOSITE,cn` 与 `GEOIP,CN` 命中的流量直连，其余流量才走所选节点。规则数据库（`GeoSite.dat` / `GeoIP.dat`，约 27 MB）在首次连接时自动下载并校验 SHA256；也可用 `DSH_TUNNEL_GEODATA_DIR` 指定本地目录离线提供。数据库不可用时回退为全局代理，并在设置页明确提示。
 - **直连名单**：国内分流覆盖不全时，可在设置页手动补充需要直连的域名、IP 或网段。
 - **智能体工具**：提供 `tunnel_connection`，支持查询状态、导入订阅、连接、断开、切换节点和测试出口。
 
@@ -162,19 +163,30 @@ $env:DSH_TUNNEL_GEODATA_DIR = "D:\my-geodata"   # 启动 DSH 前设置
 
 ## 内核与平台
 
-插件通过 [`@pkgship/mihomo`](https://www.npmjs.com/package/@pkgship/mihomo) 使用版本为 `1.19.33` 的 [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) 内核，Linux AMD64 二进制由 [`@pkgship/mihomo-linux-amd64`](https://www.npmjs.com/package/@pkgship/mihomo-linux-amd64) 提供。
+插件通过 [`@pkgship/mihomo`](https://www.npmjs.com/package/@pkgship/mihomo) 使用版本为 `1.19.33` 的 [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) 内核。内核按平台分发为独立的 npm 包，安装时由 `@pkgship/mihomo` 自动选择对应的可选依赖：
 
-若对应平台包不可用，插件会尝试从 GitHub 下载固定版本的 Linux 内核，并校验其 SHA256 校验和后再执行。也可通过环境变量指定已安装的 mihomo：
+| 平台 | 内核包 |
+|---|---|
+| Linux x64 / arm64 | `@pkgship/mihomo-linux-amd64` / `-arm64` |
+| Windows x64 / arm64 | `@pkgship/mihomo-windows-amd64` / `-arm64` |
+| macOS x64 / arm64 | `@pkgship/mihomo-darwin-amd64` / `-arm64` |
+| Android arm64 | `@pkgship/mihomo-android-arm64` |
+
+以上平台都不需要单独下载内核。只有当对应平台包不可用时，插件才会退回「从 GitHub 下载 Linux 内核」这条路径（仅 Linux，含 SHA256 校验）。
+
+也可以用环境变量指定自己准备的 mihomo：
 
 ```bash
 export DSH_TUNNEL_CORE_PATH=/absolute/path/to/mihomo
 ```
 
-请在启动 DSH 前设置该变量。默认内核方案面向 Linux；其他系统可能需要自行提供适配平台的 mihomo，兼容性需另行验证。
+请在启动 DSH 前设置该变量。
 
-> **信任边界说明**：只有 Linux AMD64/ARM64 的「从 GitHub 下载回退路径」会对二进制做 SHA256 校验（校验值取自 GitHub release 的 digest）。其他平台（Windows / macOS / Android）的二进制由对应的 npm 包（`@pkgship/mihomo-*`）提供，其信任来自 npm registry 的发布流程，而非 GitHub release 摘要。若对非 Linux 平台的内核供应链有更高要求，建议通过 `DSH_TUNNEL_CORE_PATH` 自行指定经过校验的 mihomo 可执行文件。
+> **信任边界说明**：各平台的二进制都由对应的 npm 包（`@pkgship/mihomo-*`）提供，其信任来自 npm registry 的发布流程。只有 Linux AMD64/ARM64 的「从 GitHub 下载回退路径」会额外做 SHA256 校验（校验值取自 GitHub release 的 digest）。
+>
+> 若对内核供应链有更高要求，可通过 `DSH_TUNNEL_CORE_PATH` 指定一个你自己校验过的 mihomo 可执行文件。
 
-mihomo 使用 **GPL-3.0-or-later** 许可证；插件源码与内核分开，插件的许可证声明不会改变内核的许可证。
+mihomo 使用 **GPL-3.0-or-later** 许可证，与本插件源码的 MIT 许可相互独立（详见下节）。
 
 ## 使用限制
 
@@ -182,6 +194,8 @@ mihomo 使用 **GPL-3.0-or-later** 许可证；插件源码与内核分开，插
 - 不提供 TUN、系统级 DNS 修改或系统代理切换。
 - 通过链接导入订阅时，订阅地址必须能通过当前直连网络或 DSH 已配置的代理访问；无法访问时可改用 **粘贴 YAML** 直接导入。
 - 如果所选节点无法访问 DSH 依赖的服务，连接期间对应请求会失败；断开代理可恢复直连。
+- 国内直连分流依赖规则数据库。数据库不可用（下载失败且未配置 `DSH_TUNNEL_GEODATA_DIR`）时，本次连接自动回退为全局代理，设置页会明确提示，国内流量也会走节点。
+- 数据库按固定 commit 打包，不会自动跟进上游更新；国内站点若有遗漏，用直连名单补充。
 - 管理页面通过 React 插槽集成到现有 DSH Web 界面，不替换应用根节点、不使用 iframe，也不读取其他插件的 DOM。
 
 ## 许可证
@@ -202,14 +216,25 @@ Copyright (c) 2026 luchiwanzi
 
 ## 开发
 
-安装依赖并检查 JavaScript 语法：
+安装依赖后，跑完整检查（语法、lint、单元测试）：
 
 ```bash
 pnpm install
+pnpm lint     # eslint.config.js
+pnpm test     # test/ 下的 ip / resolve / subscription 三组用例
+```
+
+只做语法检查时：
+
+```bash
 node --check index.js
 node --check client.js
 node --check lib/subscription.js
 node --check lib/mihomo.js
+node --check lib/resolve.js
+node --check lib/ip.js
 ```
+
+CI（`.github/workflows/ci.yml`）跑的就是上面这套；提交前本地跑一遍即可。
 
 Host 端使用原生 ESM；Client 端采用延迟执行的 `window.__ModuleLoader__` 工厂，并仅从浏览器模块表导入 `react`。
