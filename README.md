@@ -76,7 +76,23 @@ dsh plugin --profile web remove dsh-tunnel
 
 连接后默认启用国内直连：`GEOSITE,cn` 与 `GEOIP,CN` 命中的流量不经过节点，其余流量仍走所选节点。访问国内服务不绕路、也不消耗订阅流量。
 
-首次连接会下载规则数据库 `GeoSite.dat` 与 `GeoIP.dat`（约 27 MB，多个镜像依次尝试，SHA256 校验），之后命中缓存。下载失败时自动关闭分流、回退为全局代理，连接不受影响。
+首次连接会下载规则数据库 `GeoSite.dat` 与 `GeoIP.dat`（约 27 MB，多个镜像依次尝试，SHA256 校验），之后命中缓存。下载失败时自动关闭分流、回退为全局代理，连接不受影响——**此时设置页会给出明确提示**，不会静默降级。
+
+数据库按**固定 commit** 寻址（而非 `release` 这类滚动标签），三个镜像返回同一份字节，因此 SHA256 校验是精确的。代价是数据库不会自动跟上游更新；需要更新时由维护者同时改动 `lib/mihomo.js` 里的三处：
+
+```js
+const GEODATA_COMMIT = '3914c5cf…';   // 新的 commit
+const GEODATA_SHA256 = {
+  'GeoSite.dat': '…',                 // 该 commit 实测的 SHA256
+  'GeoIP.dat': '…',
+};
+```
+
+**离线 / 内网部署**：设置环境变量 `DSH_TUNNEL_GEODATA_DIR` 指向一个目录，并把 `GeoSite.dat`、`GeoIP.dat` 放进去，插件就不再下载、也不做 SHA256 校验，直接使用这两个文件（文件由你自行负责其来源与时效）。缺文件时会明确报告缺哪一个。
+
+```powershell
+$env:DSH_TUNNEL_GEODATA_DIR = "D:\my-geodata"   # 启动 DSH 前设置
+```
 
 `GEOSITE,cn` 覆盖不全时，可在 **设置 → 外网连接 → 直连名单** 手动补充。支持三种写法：
 
@@ -128,8 +144,8 @@ dsh plugin --profile web remove dsh-tunnel
 |---|---|
 | `.data/state.json` | 订阅地址、解析后的节点、所选节点及配额信息，权限为 `0600`。 |
 | `.data/config.yaml` | 连接时生成的 mihomo 配置，权限为 `0600`。 |
-| `.data/GeoSite.dat` | 国内域名路由数据库，权限为 `0600`。首次连接自动下载并校验 SHA256。 |
-| `.data/GeoIP.dat` | IP 归属数据库，权限为 `0600`。首次连接自动下载并校验 SHA256。 |
+| `.data/GeoSite.dat` | 国内域名路由数据库，权限为 `0600`。首次连接自动下载并校验 SHA256；设置了 `DSH_TUNNEL_GEODATA_DIR` 时改从该目录读取。 |
+| `.data/GeoIP.dat` | IP 归属数据库，权限为 `0600`。同上。 |
 | `.data/mihomo` | 打包内核不可用时下载的备用内核。 |
 
 数据目录权限为 `0700`，仅允许所有者访问。移除订阅会删除保存的订阅状态。
