@@ -58,6 +58,8 @@ dsh plugin --profile web remove dsh-tunnel
 - **DSH 范围代理**：连接后应用 DSH 进程级 HTTP 代理策略，供模型请求、`web_search` / `web_fetch`、MCP 和后续启动的子进程使用。
 - **本地监听**：HTTP/SOCKS 混合代理仅绑定 `127.0.0.1` 的随机端口，管理接口复用现有 DSH Web 服务。
 - **纯 IPv6 节点支持**：连接前自动解析各代理服务器域名，将「仅解析出 IPv6 地址」的节点钉进 `hosts`，使只有 AAAA 记录的纯 IPv6 节点也能连接；有 IPv4 答案或解析失败的节点保持原有解析路径，不影响连接。
+- **国内直连分流**：`GEOSITE,cn` 与 `GEOIP,CN` 命中的流量直连，其余流量才走所选节点。规则数据库（`GeoSite.dat` / `GeoIP.dat`，约 27 MB）在首次连接时自动下载，下载失败自动回退为全局代理。
+- **直连名单**：国内分流覆盖不全时，可在设置页手动补充需要直连的域名、IP 或网段。
 - **智能体工具**：提供 `tunnel_connection`，支持查询状态、导入订阅、连接、断开、切换节点和测试出口。
 
 ## 使用方法
@@ -69,6 +71,50 @@ dsh plugin --profile web remove dsh-tunnel
 5. 不再需要代理时点击 **断开**，恢复直接连接，并移除后续子进程的代理环境配置。
 
 在其他 DSH 安装本插件后，需要重新填写订阅；仓库不包含个人订阅、节点凭据或运行配置。
+
+### 国内直连分流与直连名单
+
+连接后默认启用国内直连：`GEOSITE,cn` 与 `GEOIP,CN` 命中的流量不经过节点，其余流量仍走所选节点。访问国内服务不绕路、也不消耗订阅流量。
+
+首次连接会下载规则数据库 `GeoSite.dat` 与 `GeoIP.dat`（约 27 MB，多个镜像依次尝试，SHA256 校验），之后命中缓存。下载失败时自动关闭分流、回退为全局代理，连接不受影响——**此时设置页会给出明确提示**，不会静默降级。
+
+数据库按**固定 commit** 寻址（而非 `release` 这类滚动标签），三个镜像返回同一份字节，因此 SHA256 校验是精确的。代价是数据库不会自动跟上游更新；需要更新时由维护者同时改动 `lib/mihomo.js` 里的三处：
+
+```js
+const GEODATA_COMMIT = '3914c5cf…';   // 新的 commit
+const GEODATA_SHA256 = {
+  'GeoSite.dat': '…',                 // 该 commit 实测的 SHA256
+  'GeoIP.dat': '…',
+};
+```
+
+**离线 / 内网部署**：设置环境变量 `DSH_TUNNEL_GEODATA_DIR` 指向一个目录，并把 `GeoSite.dat`、`GeoIP.dat` 放进去，插件就不再下载、也不做 SHA256 校验，直接使用这两个文件（文件由你自行负责其来源与时效）。缺文件时会明确报告缺哪一个。
+
+```powershell
+$env:DSH_TUNNEL_GEODATA_DIR = "D:\my-geodata"   # 启动 DSH 前设置
+```
+
+`GEOSITE,cn` 覆盖不全时，可在 **设置 → 外网连接 → 直连名单** 手动补充。支持三种写法：
+
+| 写法 | 例子 | 作用 |
+|---|---|---|
+| 域名后缀 | `example.com` | 该域名及其子域直连 |
+| IP 地址 | `192.168.1.5`、`2001:db8::1` | 该地址直连 |
+| 网段 | `10.20.30.0/24` | 该网段直连 |
+
+改动在下次连接时生效。
+
+部署方也可以通过插件配置预置固定的直连名单，与界面条目合并（配置在前，不会被界面覆盖）：
+
+```yaml
+# cordis.patch.yml 或 profile 配置
+- id: dsh-tunnel
+  name: dsh-tunnel
+  config:
+    directHosts:
+      - example.com
+      - 10.20.30.0/24
+```
 
 ### 直接粘贴配置（无需访问订阅地址）
 
@@ -86,7 +132,7 @@ dsh plugin --profile web remove dsh-tunnel
 - Base64 编码或明文 URI 列表，支持 `ss`、`vmess`、`trojan`、`vless`（含 Reality）、`hysteria2`、`tuic`、`socks5` 和 `http` 节点。
 - v2rayN 的单节点链接（`vless://`、`vmess://`、`ss://`、`trojan://` 等），可直接粘贴到订阅框或「粘贴 YAML」中，在本地解析。
 
-插件不沿用订阅中的代理组和分流规则，而是创建一个固定的 `select` 代理组，通过 `MATCH` 规则代理非本地流量。本地、回环和 RFC1918 私有地址保持直连。
+插件不沿用订阅中的代理组和分流规则，而是创建一个固定的 `select` 代理组。默认启用国内直连分流：`GEOSITE,cn` 与 `GEOIP,CN` 命中的流量直连，其余流量才走所选节点。本地、回环和 RFC1918 私有地址始终直连。规则数据库缺失时会自动回退为全局代理。
 
 订阅中的 Clash `hosts` 映射会保留，以兼容在节点 `server` 中使用特殊域名、再通过 `hosts` 映射到真实 CDN 地址的订阅。连接时插件会额外解析每个代理服务器：对「只返回 IPv6 地址」的纯 IPv6 节点自动固定 AAAA 地址，避免因内核 `ipv6: false` 而无法连接；解析失败会静默降级，绝不阻断连接。
 
@@ -98,6 +144,8 @@ dsh plugin --profile web remove dsh-tunnel
 |---|---|
 | `.data/state.json` | 订阅地址、解析后的节点、所选节点及配额信息，权限为 `0600`。 |
 | `.data/config.yaml` | 连接时生成的 mihomo 配置，权限为 `0600`。 |
+| `.data/GeoSite.dat` | 国内域名路由数据库，权限为 `0600`。首次连接自动下载并校验 SHA256；设置了 `DSH_TUNNEL_GEODATA_DIR` 时改从该目录读取。 |
+| `.data/GeoIP.dat` | IP 归属数据库，权限为 `0600`。同上。 |
 | `.data/mihomo` | 打包内核不可用时下载的备用内核。 |
 
 数据目录权限为 `0700`，仅允许所有者访问。移除订阅会删除保存的订阅状态。

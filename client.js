@@ -15,6 +15,8 @@ window.__ModuleLoader__.load({
       statusIdle: 'Not connected',
       statusDownloading: 'Preparing core…',
       statusPreparing: 'Preparing…',
+      statusPreparingFirst: 'Preparing… the first connection downloads the routing database, about 30–60s.',
+      statusStartingFirst: 'Starting core… the first connection takes about 30–60s.',
       statusStarting: 'Starting core…',
       statusConnected: 'Connected',
       statusStopping: 'Disconnecting…',
@@ -97,6 +99,17 @@ window.__ModuleLoader__.load({
       allowInsecureHint: 'Reject nodes with skip-cert-verify by default (recommended). Enable only if you trust the subscription and accept the man-in-the-middle risk.',
       allowInsecureOn: 'Insecure nodes are now allowed.',
       allowInsecureOff: 'Insecure nodes are now rejected.',
+      directListTitle: 'Direct domains',
+      directListHint: 'Domestic traffic already goes direct. Add sites that should too — a hostname, a domain suffix, an IP, or a CIDR block.',
+      directPlaceholder: 'example.com, corp.internal, 10.20.30.0/24',
+      directAdd: 'Add',
+      directEmpty: 'No extra direct sites. Domestic traffic goes direct automatically.',
+      directRemove: 'Remove',
+      directInvalid: 'That is neither a hostname nor an IP address.',
+      directDuplicate: 'Already in the list.',
+      directSaved: 'Direct list updated.',
+      directNeedsDisconnect: 'Disconnect before changing the direct list.',
+      directNote: 'Changes apply on the next connection.',
     };
 
     const zh = {
@@ -106,6 +119,8 @@ window.__ModuleLoader__.load({
       statusIdle: '未连接',
       statusDownloading: '正在准备内核…',
       statusPreparing: '正在准备…',
+      statusPreparingFirst: '正在准备…首次连接需下载分流数据库，约 30～60 秒。',
+      statusStartingFirst: '正在启动内核…首次连接约需 30～60 秒。',
       statusStarting: '正在启动内核…',
       statusConnected: '已连接',
       statusStopping: '正在断开…',
@@ -188,6 +203,17 @@ window.__ModuleLoader__.load({
       allowInsecureHint: '默认拒绝 skip-cert-verify（关闭证书校验）节点，存在中间人风险。仅在信任该订阅并接受风险时开启。',
       allowInsecureOn: '已允许不安全节点。',
       allowInsecureOff: '已拒绝不安全节点。',
+      directListTitle: '直连名单',
+      directListHint: '国内流量已默认直连。这里补充需要直连的站点：可填域名、域名后缀、IP 或网段。',
+      directPlaceholder: 'example.com、corp.internal、10.20.30.0/24',
+      directAdd: '添加',
+      directEmpty: '暂无额外直连站点。国内流量已自动直连。',
+      directRemove: '删除',
+      directInvalid: '既不是域名也不是 IP 地址。',
+      directDuplicate: '已在列表中。',
+      directSaved: '直连名单已更新。',
+      directNeedsDisconnect: '请先断开连接，再修改直连名单。',
+      directNote: '下次连接时生效。',
     };
 
     const CSS = `
@@ -241,6 +267,9 @@ window.__ModuleLoader__.load({
 .dshtunnel-input::placeholder{color:var(--dsw-alias-label-secondary)}
 .dshtunnel-input:focus{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}
 .dshtunnel-input:disabled{opacity:.6}
+.dshtunnel-directlist{flex-wrap:wrap;gap:8px}
+.dshtunnel-directlist .dshtunnel-step{gap:6px}
+.dshtunnel-directlist code{font-size:12px}
 .dshtunnel-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-top:10px;color:var(--dsw-alias-label-secondary);font-size:12px}
 .dshtunnel-meta b{color:var(--dsw-alias-label-primary);font-weight:600}
 .dshtunnel-warn{margin:10px 0 0;padding:8px 10px;border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-state-warn-primary);font-size:12px}
@@ -355,6 +384,7 @@ window.__ModuleLoader__.load({
       const [notice, setNotice] = useState('');
       const [filter, setFilter] = useState('');
       const [delays, setDelays] = useState({});
+      const [directDraft, setDirectDraft] = useState('');
       const getLocale = props.locale?.get;
       const subscribeLocale = props.locale?.subscribe;
       const [activeLocale, setActiveLocale] = useState(() => getLocale?.().active ?? 'zh');
@@ -398,6 +428,11 @@ window.__ModuleLoader__.load({
       const phase = snapshot?.phase || 'idle';
       const connected = snapshot?.connected === true;
       const working = busy !== '';
+      // The first connect provisions the routing databases (tens of megabytes)
+      // before the core can start, so it legitimately sits in `preparing` for a
+      // while. Saying so up front is the difference between "it is working" and
+      // "it is stuck" for someone watching a spinner.
+      const firstRun = snapshot?.geodataReady === false;
       const status =
         connected
           ? t('statusConnected')
@@ -406,9 +441,13 @@ window.__ModuleLoader__.load({
             : phase === 'downloading'
               ? t('statusDownloading')
               : phase === 'preparing'
-                ? t('statusPreparing')
+                ? firstRun
+                  ? t('statusPreparingFirst')
+                  : t('statusPreparing')
                 : phase === 'starting'
-                  ? t('statusStarting')
+                  ? firstRun
+                    ? t('statusStartingFirst')
+                    : t('statusStarting')
                   : phase === 'stopping'
                     ? t('statusStopping')
                     : t('statusIdle');
@@ -530,6 +569,57 @@ window.__ModuleLoader__.load({
           setDelays({});
           setNotice(t('subscriptionCleared'));
         }
+      }
+
+      async function addDirectHost() {
+        const raw = directDraft.trim();
+        if (raw === '') return;
+        if (connected) {
+          setError(t('directNeedsDisconnect'));
+          return;
+        }
+        const current = snapshot?.directHosts ?? [];
+        if (current.includes(raw)) {
+          setError(t('directDuplicate'));
+          return;
+        }
+        // The host decides what is a valid entry, and the browser does not try
+        // to guess first.
+        //
+        // An earlier version duplicated the test here with its own regex, and
+        // the two drifted apart immediately: "999.1.1.1" and "1.2.3.4/99"
+        // passed the browser and were dropped by the host (the user saw "added"
+        // and nothing appeared), while "2001:db8::1" — a perfectly good bare
+        // IPv6 address — was rejected by the browser before it ever reached the
+        // host. Two implementations of one rule is two chances to be wrong;
+        // keeping the check in one place is what stops it happening again.
+        //
+        // So the request carries the candidate list, the host filters it, and
+        // the reply is the truth. If the entry did not survive, say so instead
+        // of reporting success.
+        const data = await perform('direct', () =>
+          request('setDirectHosts', { directHosts: [...current, raw] }),
+        );
+        if (!data) return;
+        const accepted = data.state?.directHosts ?? [];
+        if (!accepted.includes(raw)) {
+          setError(t('directInvalid'));
+          return;
+        }
+        setDirectDraft('');
+        setNotice(t('directSaved'));
+      }
+
+      async function removeDirectHost(entry) {
+        if (connected) {
+          setError(t('directNeedsDisconnect'));
+          return;
+        }
+        const current = snapshot?.directHosts ?? [];
+        const data = await perform('direct', () =>
+          request('setDirectHosts', { directHosts: current.filter((item) => item !== entry) }),
+        );
+        if (data) setNotice(t('directSaved'));
       }
 
       async function toggleAllowInsecure(next) {
@@ -832,6 +922,73 @@ window.__ModuleLoader__.load({
                   ),
                 ),
               ),
+        ),
+
+        h(
+          'section',
+          { className: 'dshtunnel-card', key: 'direct' },
+          h(
+            'div',
+            { className: 'dshtunnel-card-head' },
+            h(
+              'div',
+              null,
+              h('h2', null, t('directListTitle')),
+              h('p', null, t('directListHint')),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'dshtunnel-inputrow' },
+            h('input', {
+              className: 'dshtunnel-input',
+              type: 'text',
+              autoComplete: 'off',
+              spellCheck: false,
+              placeholder: t('directPlaceholder'),
+              value: directDraft,
+              disabled: connected || working,
+              onChange: (event) => setDirectDraft(event.target.value),
+              onKeyDown: (event) => {
+                if (event.key === 'Enter') addDirectHost();
+              },
+            }),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'dshtunnel-btn primary',
+                disabled: connected || working || directDraft.trim() === '',
+                onClick: addDirectHost,
+              },
+              busy === 'direct' ? t('updating') : t('directAdd'),
+            ),
+          ),
+          (snapshot.directHosts ?? []).length === 0
+            ? h('p', { className: 'dshtunnel-muted' }, t('directEmpty'))
+            : h(
+                'div',
+                { className: 'dshtunnel-meta dshtunnel-directlist' },
+                ...(snapshot.directHosts ?? []).map((entry) =>
+                  h(
+                    'span',
+                    { className: 'dshtunnel-step', key: entry },
+                    h('code', null, entry),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'dshtunnel-btn link',
+                        disabled: connected || working,
+                        onClick: () => removeDirectHost(entry),
+                        'aria-label': t('directRemove'),
+                      },
+                      '×',
+                    ),
+                  ),
+                ),
+              ),
+          h('p', { className: 'dshtunnel-muted' }, t('directNote')),
         ),
 
         h(
