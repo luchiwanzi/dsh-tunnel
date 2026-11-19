@@ -777,10 +777,25 @@ async function connectInternal() {
     if (runtime.disposed) throw new Error('插件已卸载');
     const cnDirect = missingGeodata.length === 0;
     if (!cnDirect) {
+      // Say it in three places, because each reaches a different reader: the
+      // log for whoever debugs it, the connection error line for whoever just
+      // clicked Connect, and `warnings` for the settings page that shows the
+      // subscription state.
+      //
+      // The failure being reported here is subtle by nature — the tunnel
+      // connects fine, it is only the split routing that silently did not turn
+      // on — so "connected successfully" with no explanation is exactly the
+      // wrong message.
+      const detail = missingGeodata.join('、');
       const logger = hostContext?.logger;
       if (logger && typeof logger.warn === 'function') {
-        logger.warn('tunnel: 分流规则数据库不可用（' + missingGeodata.join('、') + '），已回退为全局代理');
+        logger.warn(`tunnel: 分流规则数据库不可用（${detail}），已回退为全局代理`);
       }
+      state.warnings = [
+        `分流规则数据库不可用（${detail}），本次连接已回退为全局代理：所有流量仍走所选节点，国内站点不会直连。`,
+        ...state.warnings,
+      ].slice(0, 8);
+      runtime.lastError = `分流未生效：缺少 ${detail}，已回退为全局代理`;
     }
 
     const { mixedPort, apiPort } = await allocatePorts();
