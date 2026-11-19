@@ -24,6 +24,25 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: 环境诊断
+        run: |
+          echo "=== node / npm / pnpm ==="
+          node --version
+          npm --version
+          pnpm --version
+          echo ""
+          echo "=== package.json 身份 ==="
+          node -p "require('./package.json').name + '@' + require('./package.json').version"
+          echo ""
+          echo "=== NODE_AUTH_TOKEN 是否设置（只打长度）==="
+          if [ -n "$NODE_AUTH_TOKEN" ]; then
+            echo "已设置，长度 ${#NODE_AUTH_TOKEN}"
+          else
+            echo "未设置！NPM_TOKEN secret 缺失"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: 检查版本是否需要发布
         id: check
         run: |
@@ -31,24 +50,47 @@ jobs:
           NAME=$(node -p "require('./package.json').name")
           echo "本地版本: $LOCAL ($NAME)"
           PUBLISHED=$(npm view "$NAME" version 2>/dev/null || echo "")
-          echo "npm 上版本: ${PUBLISHED:-（不存在）}"
+          echo "npm 上 latest: ${PUBLISHED:-（不存在）}"
           if [ "$LOCAL" = "$PUBLISHED" ]; then
-            echo "$NAME@$LOCAL 已发布，跳过"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            echo "$NAME@$LOCAL 未发布，将发布"
             echo "skip=false" >> "$GITHUB_OUTPUT"
             echo "version=$LOCAL" >> "$GITHUB_OUTPUT"
+            echo "name=$NAME" >> "$GITHUB_OUTPUT"
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: 发布到 npm
         if: steps.check.outputs.skip == 'false'
-        run: pnpm publish --access public --no-git-checks
+        run: |
+          echo "开始发布 ${{ steps.check.outputs.name }}@${{ steps.check.outputs.version }}"
+          set +e
+          pnpm publish --access public --no-git-checks 2>&1 | tee publish.log
+          EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "publish 退出码: $EXIT"
+          if [ "$EXIT" -ne 0 ]; then
+            echo "发布失败，退出码 $EXIT"
+            exit "$EXIT"
+          fi
+          echo "publish 命令返回成功"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: 发布结果
+      - name: 发布后验证
         if: steps.check.outputs.skip == 'false'
-        run: echo "已发布 ${{ steps.check.outputs.version }}"
+        run: |
+          NAME="${{ steps.check.outputs.name }}"
+          WANT="${{ steps.check.outputs.version }}"
+          echo "等待 registry 同步..."
+          sleep 15
+          GOT=$(npm view "$NAME" version 2>/dev/null || echo "")
+          echo "期望: $WANT / 实际 latest: $GOT"
+          if [ "$GOT" != "$WANT" ]; then
+            echo "发布未生效：latest 仍是 $GOT"
+            exit 1
+          fi
+          echo "发布确认生效"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
