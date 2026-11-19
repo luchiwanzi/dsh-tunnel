@@ -31,6 +31,7 @@ jobs:
           node --check lib/subscription.js
           node --check lib/mihomo.js
           node --check lib/ip.js
+          node --check lib/resolve.js
 
       - name: Lint
         run: pnpm exec eslint .
