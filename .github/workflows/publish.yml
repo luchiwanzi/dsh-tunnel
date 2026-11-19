@@ -1,0 +1,54 @@
+name: Publish
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    name: Publish to npm if version changed
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'luchiwanzi'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: 检查版本是否需要发布
+        id: check
+        run: |
+          LOCAL=$(node -p "require('./package.json').version")
+          NAME=$(node -p "require('./package.json').name")
+          echo "本地版本: $LOCAL ($NAME)"
+          PUBLISHED=$(npm view "$NAME" version 2>/dev/null || echo "")
+          echo "npm 上版本: ${PUBLISHED:-（不存在）}"
+          if [ "$LOCAL" = "$PUBLISHED" ]; then
+            echo "$NAME@$LOCAL 已发布，跳过"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "$NAME@$LOCAL 未发布，将发布"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "version=$LOCAL" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: 发布到 npm
+        if: steps.check.outputs.skip == 'false'
+        run: pnpm publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: 发布结果
+        if: steps.check.outputs.skip == 'false'
+        run: echo "已发布 ${{ steps.check.outputs.version }}"
