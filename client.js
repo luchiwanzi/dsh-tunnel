@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-tunnel',
+  id: '@wanziya/dsh-tunnel',
   factory(require) {
     const React = require('react');
     const h = React.createElement;

@@ -24,14 +24,11 @@
   "publishConfig": {
     "access": "public"
   },
-  "scripts": {
-    "test": "node --test \"test/**/*.test.js\"",
-    "lint": "eslint ."
-  },
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json",
     "./icon": "./icon.svg"
   },
   "files": [
@@ -65,5 +62,9 @@
     "@eslint/js": "^9.0.0",
     "eslint": "^9.0.0",
     "globals": "^15.0.0"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "lint": "eslint ."
   }
 }
