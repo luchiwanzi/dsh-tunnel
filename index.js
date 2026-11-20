@@ -40,6 +40,14 @@ import {
 const API_PATH = '/dsh-tunnel/api';
 const STATE_PATH = path.join(DATA_DIR, 'state.json');
 const MAX_SUBSCRIPTION_BYTES = 6 * 1024 * 1024;
+/**
+ * How long the body of a subscription response may take to arrive.
+ *
+ * The dial has its own per-address bound, but that stops applying once the
+ * connection is established: a server that sends headers and then stalls would
+ * otherwise block the read forever, and the API queue is serial.
+ */
+const BODY_READ_TIMEOUT_MS = 30_000;
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 
 /** Node URIs pasted straight into the subscription box, one per line. */
@@ -674,7 +682,10 @@ async function updateSubscription(rawUrl) {
 
   return applySubscription(result, {
     url,
-    userinfo: parseUserinfo(response.headers.get('subscription-userinfo')) ?? state.userinfo,
+    // `fetchSubscription` returns Node's plain header object (lower-cased keys),
+    // not a WHATWG `Headers` — so there is no `.get()` here. Reading it by key is
+    // the only correct form; calling `.get()` threw on every successful update.
+    userinfo: parseUserinfo(response.headers['subscription-userinfo']) ?? state.userinfo,
   });
 }
 
@@ -1231,19 +1242,37 @@ function readBody(req, maxBytes) {
  * as the cap is crossed — leaving the rest of an oversized body on the wire would
  * keep the connection alive for no reason.
  */
-async function readCapped(stream, maxBytes, label) {
+async function readCapped(stream, maxBytes, label, timeoutMs = BODY_READ_TIMEOUT_MS) {
   const length = Number(stream.headers['content-length'] ?? '');
   if (Number.isFinite(length) && length > maxBytes) throw new Error(`${label}超过 ${Math.round(maxBytes / 1024 / 1024)} MB`);
   const chunks = [];
   let size = 0;
-  for await (const value of stream) {
-    size += value.byteLength;
-    if (size > maxBytes) {
-      stream.destroy();
-      throw new Error(`${label}超过 ${Math.round(maxBytes / 1024 / 1024)} MB`);
+  // A server can send headers and then stall, which leaves `for await` blocked
+  // forever. The API queue is serial, so one stalled read wedges every later
+  // operation until the host restarts — the deadline has to be enforced here,
+  // around the read itself, not around the dial.
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    stream.destroy();
+  }, timeoutMs);
+  timer.unref?.();
+  try {
+    for await (const value of stream) {
+      size += value.byteLength;
+      if (size > maxBytes) {
+        stream.destroy();
+        throw new Error(`${label}超过 ${Math.round(maxBytes / 1024 / 1024)} MB`);
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } catch (error) {
+    if (timedOut) throw new Error(`${label}读取超时（${Math.round(timeoutMs / 1000)} 秒未收到完整内容）`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
+  if (timedOut) throw new Error(`${label}读取超时（${Math.round(timeoutMs / 1000)} 秒未收到完整内容）`);
   const contentType = String(stream.headers['content-type'] ?? '');
   const charset = /charset\s*=\s*"?([^";\s]+)/i.exec(contentType)?.[1] ?? 'utf-8';
   let decoder;
