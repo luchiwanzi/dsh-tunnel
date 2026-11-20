@@ -105,3 +105,11 @@ test('normalizeForVisit drops the fragment, lowercases the host, and elides defa
   // A non-default port is part of the identity and must be kept.
   assert.equal(normalizeForVisit(new URL('https://a.example:8443/x')), 'https://a.example:8443/x');
 });
+test('missing and invalid Location are reported as their own reasons', () => {
+  // These used to fall through as "return the 302 to the caller", which the
+  // caller then reported as an empty body — a different problem entirely.
+  const current = new URL('https://a.example/x');
+  const visited = new Set([normalizeForVisit(current)]);
+  assert.equal(resolveRedirect(current, undefined, visited, 0).reason, 'missing-location');
+  assert.equal(resolveRedirect(current, 'http://[bad', visited, 0).reason, 'invalid-location');
+});
