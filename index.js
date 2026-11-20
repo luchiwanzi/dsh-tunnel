@@ -12,12 +12,13 @@ import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
-import { lookup } from 'node:dns/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { parseSubscription, parseUserinfo } from './lib/subscription.js';
-import { isBlockedHostname, isBlockedIp, parseIpv4 } from './lib/ip.js';
+import { pinnedFetchAny } from './lib/pinned-fetch.js';
+import { normalizeForVisit, resolveRedirect } from './lib/redirect-policy.js';
+import { assertSafeTarget } from './lib/ssrf-guard.js';
 import { describePinned, pinIpv6OnlyServers } from './lib/resolve.js';
 import {
   buildConfig,
@@ -39,6 +40,14 @@ import {
 const API_PATH = '/dsh-tunnel/api';
 const STATE_PATH = path.join(DATA_DIR, 'state.json');
 const MAX_SUBSCRIPTION_BYTES = 6 * 1024 * 1024;
+/**
+ * How long the body of a subscription response may take to arrive.
+ *
+ * The dial has its own per-address bound, but that stops applying once the
+ * connection is established: a server that sends headers and then stalls would
+ * otherwise block the read forever, and the API queue is serial.
+ */
+const BODY_READ_TIMEOUT_MS = 30_000;
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 
 /** Node URIs pasted straight into the subscription box, one per line. */
@@ -560,63 +569,60 @@ function enqueue(task) {
 }
 
 /**
- * 校验订阅 URL 的目标地址，阻止 SSRF：拒绝回环、私有、链路本地、
- * 保留及云元数据地址，并解析主机名以防御 DNS rebinding。
- */
-async function assertSafeTarget(url) {
-  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  if (host === '' || isBlockedHostname(host)) {
-    throw new Error('订阅地址指向禁止访问的内部地址');
-  }
-  // 若主机名本身就是 IP 字面量，直接判定。
-  if (parseIpv4(host) !== null || host.includes(':')) {
-    if (isBlockedIp(host)) throw new Error('订阅地址指向禁止访问的内部地址');
-    return;
-  }
-  // 主机名需解析并逐条校验，防止 DNS 重绑定到内网地址。
-  let addresses;
-  try {
-    addresses = await lookup(host, { all: true, verbatim: true });
-  } catch {
-    throw new Error('订阅地址域名无法解析');
-  }
-  const resolved = addresses.map((entry) => entry.address);
-  if (resolved.length === 0) throw new Error('订阅地址域名无法解析');
-  if (resolved.some((ip) => isBlockedIp(ip))) {
-    throw new Error('订阅地址解析到禁止访问的内部地址');
-  }
-}
-
-/**
  * 手动处理重定向并逐跳校验，禁止跟随重定向进入内网地址。
+ *
+ * 每一跳都用 `pinnedFetchAny` 连到**刚校验过的那些地址**：普通 `fetch` 会自己
+ * 再解析一次域名，那正是 DNS rebinding 的窗口。重定向仍由这里手工处理
+ * （`redirect: 'manual'` 的语义），下一跳的地址同样先校验再连接。
+ *
+ * 跳数上限、协议白名单、降级拒绝与环路检测都在 `lib/redirect-policy.js`，
+ * 那里可以脱离网络测试；这里只负责把策略串起来。
+ *
+ * 返回一个 `{ status, headers, body }` 形状的对象，与 `fetch` 的消费方式一致。
  */
 async function fetchSubscription(initialUrl) {
   let current = initialUrl;
-  for (let hop = 0; hop < 5; hop += 1) {
-    await assertSafeTarget(current);
-    const response = await fetch(current, {
-      redirect: 'manual',
+  const visited = new Set([normalizeForVisit(initialUrl)]);
+  for (let hop = 0; ; hop += 1) {
+    const target = await assertSafeTarget(current);
+    // 同一域名可能返回多条地址，只有部分可达（常见：IPv6 无路由）。回退是安全的
+    // —— 列表里每一条都已通过守卫，不是「重试到能用为止」。
+    const response = await pinnedFetchAny(current, target.addresses, {
       headers: {
         'user-agent': 'clash.meta/1.19.33',
         accept: 'text/yaml,text/plain,application/yaml,*/*',
       },
       signal: AbortSignal.timeout(30_000),
     });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location');
-      if (typeof location !== 'string' || location.trim() === '') {
-        return response;
+    const status = response.statusCode ?? 0;
+    if (status >= 300 && status < 400) {
+      // Drain the redirect body so the socket is released before the next hop.
+      response.resume();
+      const decision = resolveRedirect(current, response.headers.location, visited, hop);
+      if (decision.action === 'stop') {
+        if (decision.reason === 'too-many-hops') throw new Error('订阅地址重定向次数过多');
+        if (decision.reason === 'redirect-loop') throw new Error('订阅地址重定向出现环路');
+        if (decision.reason === 'downgrade-refused') {
+          throw new Error('订阅地址从 HTTPS 重定向到 HTTP，已拒绝（会丢失传输加密）');
+        }
+        if (decision.reason.startsWith('protocol-not-allowed')) {
+          throw new Error('订阅地址重定向到了不受支持的协议');
+        }
+        // 重定向本身有问题时给出自己的诊断。返回 body:null 会让上层报
+        // 「订阅地址没有返回内容」，那是在说另一件事，会误导排障。
+        if (decision.reason === 'missing-location') {
+          throw new Error(`订阅地址返回了重定向（HTTP ${status}）但没有 Location 头`);
+        }
+        if (decision.reason === 'invalid-location') {
+          throw new Error(`订阅地址返回了无法解析的重定向地址（HTTP ${status}）`);
+        }
+        throw new Error(`订阅地址重定向失败（HTTP ${status}）`);
       }
-      try {
-        current = new URL(location, current);
-      } catch {
-        return response;
-      }
+      current = decision.url;
       continue;
     }
-    return response;
+    return { status, headers: response.headers, body: response };
   }
-  throw new Error('订阅地址重定向次数过多');
 }
 
 /** 脱敏订阅 URL，避免把内嵌令牌/密码暴露给前端。 */
@@ -651,7 +657,8 @@ async function updateSubscription(rawUrl) {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('订阅链接必须使用 http 或 https');
   }
-  await assertSafeTarget(parsed);
+  // 地址校验交给 fetchSubscription 的逐跳守卫：这里再查一次只会让同一个域名
+  // 被解析两遍，而且它拿到的地址并不会被用于连接（真正钉住的是循环里那次）。
 
   let response;
   try {
@@ -659,8 +666,11 @@ async function updateSubscription(rawUrl) {
   } catch (error) {
     throw new Error(`获取订阅失败：${errorMessage(error).split(url).join('<订阅链接>')}`);
   }
-  if (!response.ok) throw new Error(`订阅地址返回 HTTP ${response.status}`);
-  const body = await readCapped(response, MAX_SUBSCRIPTION_BYTES, '订阅内容');
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`订阅地址返回 HTTP ${response.status}`);
+  }
+  if (response.body === null) throw new Error('订阅地址没有返回内容');
+  const body = await readCapped(response.body, MAX_SUBSCRIPTION_BYTES, '订阅内容');
   if (body.trim().startsWith('<')) throw new Error('订阅地址返回了网页而不是节点配置，请检查链接是否需要 Clash UA 或已过期');
 
   let result;
@@ -672,7 +682,10 @@ async function updateSubscription(rawUrl) {
 
   return applySubscription(result, {
     url,
-    userinfo: parseUserinfo(response.headers.get('subscription-userinfo')) ?? state.userinfo,
+    // `fetchSubscription` returns Node's plain header object (lower-cased keys),
+    // not a WHATWG `Headers` — so there is no `.get()` here. Reading it by key is
+    // the only correct form; calling `.get()` threw on every successful update.
+    userinfo: parseUserinfo(response.headers['subscription-userinfo']) ?? state.userinfo,
   });
 }
 
@@ -1221,28 +1234,46 @@ function readBody(req, maxBytes) {
   });
 }
 
-async function readCapped(response, maxBytes, label) {
-  const length = Number(response.headers.get('content-length') ?? '');
+/**
+ * Read a response body with a hard byte cap.
+ *
+ * Takes the `IncomingMessage` a pinned request produced (a Node readable, not a
+ * WHATWG `Response`), so it reads via `for await` and destroys the socket as soon
+ * as the cap is crossed — leaving the rest of an oversized body on the wire would
+ * keep the connection alive for no reason.
+ */
+async function readCapped(stream, maxBytes, label, timeoutMs = BODY_READ_TIMEOUT_MS) {
+  const length = Number(stream.headers['content-length'] ?? '');
   if (Number.isFinite(length) && length > maxBytes) throw new Error(`${label}超过 ${Math.round(maxBytes / 1024 / 1024)} MB`);
-  if (response.body === null) throw new Error(`${label}为空`);
-  const reader = response.body.getReader();
   const chunks = [];
   let size = 0;
+  // A server can send headers and then stall, which leaves `for await` blocked
+  // forever. The API queue is serial, so one stalled read wedges every later
+  // operation until the host restarts — the deadline has to be enforced here,
+  // around the read itself, not around the dial.
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    stream.destroy();
+  }, timeoutMs);
+  timer.unref?.();
   try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    for await (const value of stream) {
       size += value.byteLength;
       if (size > maxBytes) {
-        await reader.cancel().catch(() => {});
+        stream.destroy();
         throw new Error(`${label}超过 ${Math.round(maxBytes / 1024 / 1024)} MB`);
       }
       chunks.push(value);
     }
+  } catch (error) {
+    if (timedOut) throw new Error(`${label}读取超时（${Math.round(timeoutMs / 1000)} 秒未收到完整内容）`);
+    throw error;
   } finally {
-    reader.releaseLock?.();
+    clearTimeout(timer);
   }
-  const contentType = response.headers.get('content-type') ?? '';
+  if (timedOut) throw new Error(`${label}读取超时（${Math.round(timeoutMs / 1000)} 秒未收到完整内容）`);
+  const contentType = String(stream.headers['content-type'] ?? '');
   const charset = /charset\s*=\s*"?([^";\s]+)/i.exec(contentType)?.[1] ?? 'utf-8';
   let decoder;
   try {
