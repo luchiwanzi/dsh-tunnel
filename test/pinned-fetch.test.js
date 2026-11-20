@@ -268,3 +268,116 @@ test('an http URL never uses the TLS connector', async () => {
   assert.equal(used[0].options.host, '1.1.1.1');
   assert.equal(used[0].options.port, 80);
 });
+test('an IP-literal https URL omits SNI instead of setting an invalid name', async () => {
+  const dialled = [];
+  const connectors = {
+    net: () => { throw new Error('net connector must not be used for https') },
+    tls: (options, callback) => {
+      dialled.push(options);
+      const error = new Error('skipped');
+      error.code = 'ETEST';
+      callback(error);
+      return { on() {}, destroy() {} };
+    },
+  };
+  // RFC 6066 forbids an IP in SNI; Node warns (DEP0123) and will ignore it.
+  await pinnedFetch(new URL('https://1.1.1.1/x'), '1.1.1.1', 4, { connectors }).catch(() => {});
+  assert.equal(dialled.length, 1);
+  assert.equal(dialled[0].servername, undefined);
+
+  // An IPv6 literal keeps its brackets in URL.hostname, which is not a name either.
+  dialled.length = 0;
+  await pinnedFetch(new URL('https://[2606:4700::1]/x'), '2606:4700::1', 6, { connectors }).catch(() => {});
+  assert.equal(dialled.length, 1);
+  assert.equal(dialled[0].servername, undefined);
+});
+
+test('a named https URL still sets SNI', async () => {
+  const dialled = [];
+  const connectors = {
+    net: () => { throw new Error('unused') },
+    tls: (options, callback) => {
+      dialled.push(options);
+      const error = new Error('skipped');
+      error.code = 'ETEST';
+      callback(error);
+      return { on() {}, destroy() {} };
+    },
+  };
+  await pinnedFetch(new URL('https://sub.example/x'), '1.1.1.1', 4, { connectors }).catch(() => {});
+  assert.equal(dialled[0].servername, 'sub.example');
+});
+
+test('a TLS handshake failure is surfaced, not retried as an unreachable address', async () => {
+  // A certificate mismatch fails identically for every address of the name, so
+  // retrying would bury the real cause. Only dial failures fall through.
+  let attempts = 0;
+  const connectors = {
+    net: () => { throw new Error('unused') },
+    tls: (options, callback) => {
+      attempts += 1;
+      const error = new Error('certificate has expired');
+      error.code = 'CERT_HAS_EXPIRED';
+      callback(error);
+      return { on() {}, destroy() {} };
+    },
+  };
+  const error = await pinnedFetchAny(
+    new URL('https://bad.example/x'),
+    [{ address: '1.1.1.1', family: 4 }, { address: '1.0.0.1', family: 4 }],
+    { connectors },
+  ).catch((caught) => caught);
+  assert.equal(attempts, 1, 'a handshake failure must not be retried on the next address');
+  assert.equal(error.code, 'CERT_HAS_EXPIRED', 'the original cause must survive');
+  assert.doesNotMatch(error.message, /所有地址均无法连接/);
+});
+
+test('a dial failure still falls through to the next address', async () => {
+  let attempts = 0;
+  const connectors = {
+    net: (options, callback) => {
+      attempts += 1;
+      const error = new Error('refused');
+      error.code = 'ECONNREFUSED';
+      callback(error);
+      return { on() {}, destroy() {} };
+    },
+    tls: () => { throw new Error('unused') },
+  };
+  const error = await pinnedFetchAny(
+    new URL('http://x.example/'),
+    [{ address: '1.1.1.1', family: 4 }, { address: '1.0.0.1', family: 4 }],
+    { connectors },
+  ).catch((caught) => caught);
+  assert.equal(attempts, 2, 'every address must be tried');
+  assert.match(error.message, /所有地址均无法连接/);
+});
+test('an unroutable address is abandoned per-attempt, not at the caller timeout', async () => {
+  // An address family with no route hangs instead of failing. Without a
+  // per-attempt bound, a hostname with both families takes as long as every
+  // unreachable address in turn — the whole fetch then times out even though a
+  // reachable address was in the list.
+  //
+  // The connector only has to *not connect*: the wrapper itself turns the
+  // per-attempt abort into a callback with an ABORT_ERR, which is what makes the
+  // chain move on. A stub that connected instantly would never exercise it.
+  let attempts = 0;
+  const connectors = {
+    net: () => {
+      attempts += 1;
+      // Never call back: the dial hangs, exactly like an unroutable address.
+      return { on() {}, destroy() {} };
+    },
+    tls: () => { throw new Error('unused') },
+  };
+  const started = Date.now();
+  await pinnedFetchAny(
+    new URL('http://hang.example/'),
+    [{ address: '2001:db8::1', family: 6 }, { address: '1.1.1.1', family: 4 }],
+    { connectors },
+  ).catch(() => {});
+  // The first address must be abandoned on the per-attempt budget, so the second
+  // one is reached well before any caller-level timeout.
+  assert.equal(attempts, 2, 'the hanging address must not block the next one');
+  assert.ok(Date.now() - started < 10_000, 'the chain must not wait out a caller timeout');
+});
