@@ -147,3 +147,24 @@ test('BLOCKED_CIDRS 只含 IPv4 条目（IPv6 走单独的清单）', () => {
     assert.ok(cidr.includes('.'), `BLOCKED_CIDRS 不应出现 IPv6 条目：${cidr}`);
   }
 });
+// ---- 内嵌 IPv4 的 IPv6 形式 ----
+// 这些写法承载一个 IPv4 目标，必须按内嵌的 IPv4 判定。NAT64 / 6to4 只有在
+// 部署了相应路由时才是通路，但判定不能依赖运行平台的网络配置。
+test('拦截内嵌回环 IPv4 的各类 IPv6 形式', () => {
+  assert.equal(isBlockedIp('::7f00:1'), true);          // IPv4-compatible
+  assert.equal(isBlockedIp('64:ff9b::7f00:1'), true);   // NAT64
+  assert.equal(isBlockedIp('2002:7f00:1::'), true);     // 6to4
+  assert.equal(isBlockedIp('::ffff:0:7f00:1'), true);   // IPv4-translated
+});
+
+test('拦截内嵌云元数据地址的各类 IPv6 形式', () => {
+  assert.equal(isBlockedIp('::a9fe:a9fe'), true);
+  assert.equal(isBlockedIp('64:ff9b::a9fe:a9fe'), true);
+  assert.equal(isBlockedIp('2002:a9fe:a9fe::'), true);
+});
+
+test('内嵌公网 IPv4 的 IPv6 形式仍然放行', () => {
+  // 只拦内嵌的内网地址，不整段封杀 NAT64/6to4 —— 否则合法订阅也会失效。
+  assert.equal(isBlockedIp('64:ff9b::808:808'), false);
+  assert.equal(isBlockedIp('2002:808:808::'), false);
+});
