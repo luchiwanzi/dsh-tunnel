@@ -128,7 +128,7 @@ $env:DSH_TUNNEL_GEODATA_DIR = "D:\my-geodata"   # 启动 DSH 前设置
 ```yaml
 # cordis.patch.yml 或 profile 配置
 - id: dsh-tunnel
-  name: dsh-tunnel
+  name: '@wanziya/dsh-tunnel'
   config:
     directHosts:
       - example.com
