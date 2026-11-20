@@ -600,8 +600,15 @@ async function fetchSubscription(initialUrl) {
         if (decision.reason.startsWith('protocol-not-allowed')) {
           throw new Error('订阅地址重定向到了不受支持的协议');
         }
-        // 其余情况（缺 Location / 非法 URL）按原样返回，让上层按状态码处理。
-        return { status, headers: response.headers, body: null };
+        // 重定向本身有问题时给出自己的诊断。返回 body:null 会让上层报
+        // 「订阅地址没有返回内容」，那是在说另一件事，会误导排障。
+        if (decision.reason === 'missing-location') {
+          throw new Error(`订阅地址返回了重定向（HTTP ${status}）但没有 Location 头`);
+        }
+        if (decision.reason === 'invalid-location') {
+          throw new Error(`订阅地址返回了无法解析的重定向地址（HTTP ${status}）`);
+        }
+        throw new Error(`订阅地址重定向失败（HTTP ${status}）`);
       }
       current = decision.url;
       continue;
