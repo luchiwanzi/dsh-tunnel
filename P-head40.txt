@@ -1,0 +1,40 @@
+/**
+ * Subscription parsing for the Tunnel plugin.
+ *
+ * Supports:
+ *  - Clash / Clash.Meta / mihomo YAML documents with an inline `proxies` list.
+ *  - Base64-encoded or plain URI lists (ss, vmess, trojan, vless, hysteria2,
+ *    tuic, socks5, http).
+ *
+ * Only node definitions are kept. Subscription-provided groups and rules are
+ * deliberately ignored: the plugin owns a single deterministic group so the
+ * user can select a node from the management page.
+ */
+
+import { parse as parseYaml } from 'yaml';
+
+const MAX_NODES = 500;
+
+/**
+ * Proxy types the bundled mihomo core actually accepts, with the fields it
+ * refuses to load without.
+ *
+ * This table exists because of how the core reacts to a single bad node: it
+ * rejects the *whole* configuration, and the only thing it says is
+ * `unsupport proxy type: x` or `has unset fields: a, b` on stderr. So one
+ * unknown protocol anywhere in a subscription — a provider rolling out a new
+ * one, a typo, a YAML entry that is not really a proxy — turns "Connect" into
+ * "内核启动失败" with no mention of which node or which field.
+ *
+ * The types and required fields here were measured against the pinned core
+ * (mihomo v1.19.33) by feeding it one proxy at a time. `ssr`/`vmess`/
+ * `hysteria` `snell`/`wireguard`/`ssh`/`mieru` are supported by the core but
+ * need their own mandatory fields, which are listed so a node missing them is
+ * reported as such instead of surviving to the core.
+ *
+ * A type absent from this table is dropped at parse time, with a warning that
+ * names it. That is deliberately lossy: the alternative is a subscription that
+ * cannot connect at all because one of two hundred nodes used a newer protocol.
+ */
+const SUPPORTED_TYPES = new Map([
+  ['ss', []],
