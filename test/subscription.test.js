@@ -176,7 +176,9 @@ test('无法识别的格式抛出异常', () => {
 test('端口范围校验', () => {
   const bad = uriList('socks5://example.com:99999#bad');
   assert.throws(() => parseSubscription(bad), /无法识别内容格式|没有可用节点/);
-});test('未知节点类型在解析期被剔除并给出可读警告', () => {
+});
+
+test('未知节点类型在解析期被剔除并给出可读警告', () => {
   const yaml = [
     'proxies:',
     '  - name: 香港 01',
@@ -209,8 +211,40 @@ test('全部节点类型都不支持时，异常信息说明原因', () => {
 });
 
 test('支持的协议类型不被误剔除', () => {
-  const types = ['ss', 'vmess', 'vless', 'trojan', 'hysteria2', 'tuic', 'socks5', 'http', 'anytls', 'mieru'];
+  const types = ['ss', 'vmess', 'vless', 'trojan', 'hysteria2', 'tuic', 'socks5', 'http', 'anytls', 'mieru', 'tailscale'];
   const yaml = ['proxies:', ...types.map((type, index) => `  - {name: n${index}, type: ${type}, server: 1.2.3.${index + 1}, port: 443}`)].join('\n');
   const result = parseSubscription(yaml);
   assert.equal(result.nodes.length, types.length);
+});
+
+test('tailscale 节点不被当作未知协议剔除', () => {
+  // The pinned core accepts `tailscale` (measured on v1.19.33), and real
+  // tailscale entries carry no server/port at all. Both halves matter: a
+  // whitelist that omits the type drops a working node, and one that keeps it
+  // but still demands server/port drops it one step later.
+  const yaml = [
+    'proxies:',
+    '  - {name: "TS 出口", type: tailscale, "private-key": "tskey-auth-abc"}',
+    '  - {name: ok1, type: ss, server: 1.2.3.4, port: 443, cipher: aes-128-gcm, password: p}',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  assert.equal(result.nodes.length, 2);
+  assert.equal(result.nodes[0].name, 'TS 出口');
+  assert.equal(result.nodes[0].type, 'tailscale');
+  assert.ok(!result.warnings.join(' ').includes('tailscale'), result.warnings.join(' '));
+});
+
+test('警告中的节点名不携带控制字符', () => {
+  // The name comes straight from the provider's YAML. It reaches the settings
+  // page and the log, so an embedded ESC/BEL must not survive: React escapes
+  // the markup, but the terminal does not.
+  const yaml = [
+    'proxies:',
+    '  - {name: "bad\\u001b[31mNode\\u0007", type: quasimodo, server: 1.2.3.4, port: 443}',
+    '  - {name: ok, type: ss, server: 1.2.3.4, port: 443, cipher: aes-128-gcm, password: p}',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  const warning = result.warnings.join(' ');
+  assert.ok(result.nodes.length === 1);
+  assert.ok(!/\p{Cc}/u.test(warning), JSON.stringify(warning));
 });

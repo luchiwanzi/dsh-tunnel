@@ -15,7 +15,7 @@ import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { parseSubscription, parseUserinfo } from './lib/subscription.js';
+import { needsEndpoint, parseSubscription, parseUserinfo } from './lib/subscription.js';
 import { pinnedFetchAny } from './lib/pinned-fetch.js';
 import { normalizeForVisit, resolveRedirect } from './lib/redirect-policy.js';
 import { assertSafeTarget } from './lib/ssrf-guard.js';
@@ -322,8 +322,7 @@ function isStoredNode(node) {
     typeof node.name === 'string' &&
     node.name !== '' &&
     typeof node.type === 'string' &&
-    typeof node.server === 'string' &&
-    Number.isInteger(node.port)
+    (!needsEndpoint(node.type) || (typeof node.server === 'string' && Number.isInteger(node.port)))
   );
 }
 
@@ -843,6 +842,10 @@ async function connectInternal() {
     // has no way to tell which of two hundred nodes is the one to delete.
     const diagnosis = await diagnoseConfig(corePath, state.nodes);
     if (runtime.disposed) throw new Error('插件已卸载');
+    // The check is interruptible now, so a Disconnect during it has to stop the
+    // connect here. Without this the flow would carry on and start a core the
+    // user has just asked to shut down.
+    if (runtime.connectAbort?.signal.aborted === true) throw new Error('连接已取消');
     if (diagnosis !== null) throw new Error(diagnosis);
 
     const abort = new AbortController();
@@ -912,10 +915,6 @@ async function connectInternal() {
 }
 
 /**
- * Extend the stored host overrides with a pinned address for every proxy server
- * that resolves to IPv6 only.
- */
-/**
  * Ask the core to check the generated file, and turn a rejection into advice.
  *
  * Returns `null` when the file is good. Otherwise returns a message that says
@@ -941,7 +940,7 @@ async function diagnoseConfig(corePath, nodes) {
     const runner = typeof service?.spawn === 'function'
       ? makeConfigRunner(service, { env: { HOME: DATA_DIR, TMPDIR: DATA_DIR } })
       : undefined;
-    result = await testConfig(corePath, { runner });
+    result = await testConfig(corePath, { runner, signal: runtime.connectAbort?.signal });
   } catch (error) {
     // The check itself failing must never replace the real error path: fall
     // through to a normal start and let the core report whatever it reports.
@@ -968,6 +967,12 @@ async function diagnoseConfig(corePath, nodes) {
   }
 
   const badNames = new Set([...badIndexes].map((index) => nodes[index]?.name).filter((name) => typeof name === 'string'));
+  // Dropping entries is only self-healing when a subscription can put them
+  // back. A node list the user pasted in has no other source: removing it
+  // would empty the settings page with nothing left to re-import from.
+  if (state.subscriptionUrl === '') {
+    return `${lines.join('；')}。这些节点无法使用，请更新订阅或重新导入后再试`;
+  }
   state.nodes = state.nodes.filter((node) => !badNames.has(node.name));
   if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
   const note = `已自动移除 ${badNames.size} 个无法使用的节点（${[...badNames].slice(0, 5).join('、')}${badNames.size > 5 ? ' 等' : ''}），请重新点击连接`;
@@ -981,6 +986,10 @@ async function diagnoseConfig(corePath, nodes) {
   return `${lines.join('；')}。${note}`;
 }
 
+/**
+ * Extend the stored host overrides with a pinned address for every proxy server
+ * that resolves to IPv6 only.
+ */
 async function resolveProxyServers(nodes, storedHosts) {
   const base = storedHosts !== null && typeof storedHosts === 'object' ? storedHosts : {};
   try {
