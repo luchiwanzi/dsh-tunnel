@@ -100,7 +100,8 @@ window.__ModuleLoader__.load({
       allowInsecure: 'Allow insecure nodes',
       allowInsecureHint: 'Reject nodes with skip-cert-verify by default (recommended). Enable only if you trust the subscription and accept the man-in-the-middle risk.',
       allowInsecureOn: 'Insecure nodes are now allowed.',
-      allowInsecureOff: 'Insecure nodes are now rejected.',
+      allowInsecureOff: 'Insecure nodes are now hidden. Re-enable to restore them.',
+      nodeHidden: 'Hidden: this node disables certificate verification. Enable “Allow insecure nodes” to use it.',
       directListTitle: 'Direct domains',
       directListHint: 'Domestic traffic already goes direct. Add sites that should too — a hostname, a domain suffix, an IP, or a CIDR block.',
       directPlaceholder: 'example.com, corp.internal, 10.20.30.0/24',
@@ -206,7 +207,8 @@ window.__ModuleLoader__.load({
       allowInsecure: '允许不安全节点',
       allowInsecureHint: '默认拒绝 skip-cert-verify（关闭证书校验）节点，存在中间人风险。仅在信任该订阅并接受风险时开启。',
       allowInsecureOn: '已允许不安全节点。',
-      allowInsecureOff: '已拒绝不安全节点。',
+      allowInsecureOff: '已隐藏不安全节点，重新开启即可恢复。',
+      nodeHidden: '已隐藏：该节点关闭了证书校验。开启「允许不安全节点」后可用。',
       directListTitle: '直连名单',
       directListHint: '国内流量已默认直连。这里补充需要直连的站点：可填域名、域名后缀、IP 或网段。',
       directPlaceholder: 'example.com、corp.internal、10.20.30.0/24',
@@ -281,6 +283,8 @@ window.__ModuleLoader__.load({
 .dshtunnel-node{width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;text-align:left;cursor:pointer}
 .dshtunnel-node:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}
 .dshtunnel-node:disabled{opacity:.6;cursor:not-allowed}
+.dshtunnel-node.hidden{opacity:.45;cursor:not-allowed}
+.dshtunnel-node.hidden .dshtunnel-node-name{text-decoration:line-through}
 .dshtunnel-node.selected{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
 .dshtunnel-radio{width:14px;height:14px;flex:none;border-radius:50%;border:1.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base)}
 .dshtunnel-node.selected .dshtunnel-radio{border-color:var(--dsw-alias-brand-primary);box-shadow:inset 0 0 0 3px var(--dsw-alias-brand-primary)}
@@ -486,7 +490,9 @@ window.__ModuleLoader__.load({
           setError(reason instanceof Error ? reason.message : String(reason));
           return null;
         } finally {
-          setBusy('');
+          // 只在 busy 仍等于自己时清：并发操作会各自 setBusy，后发先至的
+          // 一个若无条件 setBusy('') 会把另一个还在进行的操作也标成空闲。
+          setBusy((current) => (current === label ? '' : current));
         }
       }
 
@@ -909,11 +915,11 @@ window.__ModuleLoader__.load({
                       {
                         type: 'button',
                         key: node.name,
-                        className: `dshtunnel-node${node.name === snapshot.selected ? ' selected' : ''}`,
-                        disabled: working,
+                        className: `dshtunnel-node${node.name === snapshot.selected ? ' selected' : ''}${node.hidden ? ' hidden' : ''}`,
+                        disabled: working || node.hidden === true,
                         onClick: () => selectNode(node),
                         onDoubleClick: () => latencyOne(node),
-                        title: `${node.name} — ${t('selectNode')}`,
+                        title: node.hidden ? t('nodeHidden') : `${node.name} — ${t('selectNode')}`,
                         'aria-pressed': node.name === snapshot.selected,
                       },
                       h('span', { className: 'dshtunnel-radio' }),
