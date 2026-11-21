@@ -33,6 +33,7 @@ window.__ModuleLoader__.load({
       subscriptionTitle: 'Subscription',
       subscriptionHint: 'Paste a Clash / mihomo subscription URL, or a base64 node list. Nodes are parsed locally.',
       subscriptionPlaceholder: 'https://example.com/api/v1/client/subscribe?token=…',
+      subscriptionSavedHint: 'Saved. Type a new URL to replace:',
       urlMode: 'Subscription URL',
       yamlMode: 'Paste YAML',
       yamlHint: 'Paste a Clash / mihomo YAML, or a single v2rayN node link (vless://, vmess://, ss://, trojan://, …). It is parsed locally.',
@@ -137,6 +138,7 @@ window.__ModuleLoader__.load({
       subscriptionTitle: '订阅',
       subscriptionHint: '粘贴 Clash / mihomo 订阅链接，或 Base64 节点列表。节点在本地解析。',
       subscriptionPlaceholder: 'https://example.com/api/v1/client/subscribe?token=…',
+      subscriptionSavedHint: '已保存，重新填写可更换：',
       urlMode: '订阅链接',
       yamlMode: '粘贴 YAML',
       yamlHint: '粘贴 Clash / mihomo YAML 配置，或 v2rayN 的单节点链接（vless://、vmess://、ss://、trojan:// 等），节点在本地解析。',
@@ -405,7 +407,9 @@ window.__ModuleLoader__.load({
           .then((data) => {
             if (!alive) return;
             setSnapshot(data.state);
-            setUrlDraft(data.state.subscription.url || '');
+            // 这个值是脱敏后的展示值，不能当真实地址回填：拿它去请求必然失败，
+            // 而用户手里那份真链接会被这把假值顶掉。
+            setUrlDraft('');
           })
           .catch((reason) => {
             if (alive) setError(reason.message);
@@ -495,7 +499,7 @@ window.__ModuleLoader__.load({
         }
         const data = await perform('subscribe', () => request('subscribe', { url: urlDraft.trim() }));
         if (data) {
-          setUrlDraft(data.state.subscription.url || '');
+          setUrlDraft('');
           setNotice(`${t('subscriptionSaved')} ${data.state.subscription.nodeCount} ${t('nodes')}`);
         }
       }
@@ -784,7 +788,10 @@ window.__ModuleLoader__.load({
               inputMode: 'url',
               autoComplete: 'off',
               spellCheck: false,
-              placeholder: t('subscriptionPlaceholder'),
+              // 输入框现在是空的，用户需要知道订阅其实已经保存了。
+              placeholder: snapshot?.subscription?.hasSubscription
+                ? `${t('subscriptionSavedHint')} ${snapshot.subscription.url}`
+                : t('subscriptionPlaceholder'),
               value: urlDraft,
               disabled: connected || working,
               onChange: (event) => setUrlDraft(event.target.value),

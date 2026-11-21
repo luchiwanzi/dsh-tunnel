@@ -57,8 +57,12 @@ test('拦截 IPv6 链路本地 fe80::/10', () => {
   assert.equal(isBlockedIp('febf::1'), true);
 });
 
-test('放行 fec0::（已废弃的 site-local，不在 fe80::/10）', () => {
-  assert.equal(isBlockedIp('fec0::1'), false);
+test('拦截 fec0::/10（已废弃的 site-local）', () => {
+  // 行为变更：fec0::/10 早于 RFC 3879 废弃，现代路由不通，但旧设备/旧配置
+  // 仍可能把它解析成内网地址，放行等于留一条通向内网的备选路径。
+  assert.equal(isBlockedIp('fec0::1'), true);
+  assert.equal(isBlockedIp('fec0::'), true);
+  assert.equal(isBlockedIp('feff::1'), true);
 });
 
 test('拦截 IPv6 私有 ULA fc00::/7', () => {
@@ -73,7 +77,8 @@ test('放行 fe00::（不在 fc00::/7 内）', () => {
 
 test('放行公网 IPv6 地址', () => {
   assert.equal(isBlockedIp('2606:4700:4700::1111'), false);
-  assert.equal(isBlockedIp('2001:db8::1'), false);
+  assert.equal(isBlockedIp('2606:4700::1'), false);
+  // 2001:db8::/32 是文档段，已改判为拦截（见下方“IPv6 保留 / 文档 / 组播段”）。
 });
 
 // ---- IPv4-mapped IPv6 ----
@@ -167,4 +172,52 @@ test('内嵌公网 IPv4 的 IPv6 形式仍然放行', () => {
   // 只拦内嵌的内网地址，不整段封杀 NAT64/6to4 —— 否则合法订阅也会失效。
   assert.equal(isBlockedIp('64:ff9b::808:808'), false);
   assert.equal(isBlockedIp('2002:808:808::'), false);
+});
+
+// ---- IPv4 组播 / 保留 / 文档 / 基准测试段 ----
+// 回归：这些网段此前全部被放行，其中 198.18.0.0/15 在 Clash/TUN 场景下
+// 由虚拟网卡真实承接流量，是能打穿本机服务的活路径。
+test('拦截 IPv4 组播、保留、文档与基准测试段', () => {
+  assert.equal(isBlockedIp('224.0.0.1'), true);       // 组播 224.0.0.0/4
+  assert.equal(isBlockedIp('239.1.1.1'), true);       // 组播
+  assert.equal(isBlockedIp('240.0.0.1'), true);       // 保留 240.0.0.0/4
+  assert.equal(isBlockedIp('255.255.255.255'), true); // 广播
+  assert.equal(isBlockedIp('198.18.0.1'), true);      // 基准测试 198.18.0.0/15
+  assert.equal(isBlockedIp('198.19.255.255'), true);  // 同上，另一端
+  assert.equal(isBlockedIp('192.0.2.1'), true);       // TEST-NET-1
+  assert.equal(isBlockedIp('198.51.100.1'), true);    // TEST-NET-2
+  assert.equal(isBlockedIp('203.0.113.1'), true);     // TEST-NET-3
+  assert.equal(isBlockedIp('192.0.0.1'), true);       // IETF 协议分配
+  assert.equal(isBlockedIp('192.88.99.1'), true);     // 6to4 中继
+});
+
+// ---- IPv6 组播 / 文档 / discard / Teredo / 本地 NAT64 ----
+test('拦截 IPv6 组播、文档、discard 与 site-local 段', () => {
+  assert.equal(isBlockedIp('ff02::1'), true);       // ff00::/8 组播（全节点）
+  assert.equal(isBlockedIp('ff05::2'), true);       // 组播
+  assert.equal(isBlockedIp('2001:db8::1'), true);   // 文档段
+  assert.equal(isBlockedIp('2001:db8:ffff::1'), true);
+  assert.equal(isBlockedIp('100::1'), true);        // 100::/64 discard-only
+  assert.equal(isBlockedIp('fec0::1'), true);       // fec0::/10
+});
+
+test('拦截内嵌穷举：本地 NAT64（RFC 8215）与 Teredo', () => {
+  // 回归：这两条此前被整体放行。64:ff9b:1::/48 只在 /96 之外的位宽上，
+  // 而 Teredo 的末 32 位是「按位取反」的 IPv4，不是直接内嵌。
+  assert.equal(isBlockedIp('64:ff9b:1::a9fe:a9fe'), true);        // -> 169.254.169.254
+  assert.equal(isBlockedIp('64:ff9b:1::7f00:1'), true);           // -> 127.0.0.1
+  assert.equal(isBlockedIp('2001:0:0:0:0:0:80ff:fffe'), true);    // Teredo -> 127.0.0.1
+  // 反例：Teredo 的末 32 位是取反后的 IPv4，取反后为公网就应放行。
+  // 2001::f7f7:f7f7 -> 8.8.8.8；2001::a9fe:a9fe -> 86.1.86.1。
+  assert.equal(isBlockedIp('2001:0:0:0:0:0:f7f7:f7f7'), false);
+  assert.equal(isBlockedIp('2001:0:0:0:0:0:a9fe:a9fe'), false);
+  // 反例：本地 NAT64 内嵌公网 IPv4 仍然可用
+  assert.equal(isBlockedIp('64:ff9b:1::808:808'), false);         // -> 8.8.8.8
+});
+
+test('公网地址仍放行（防止过度拦截）', () => {
+  assert.equal(isBlockedIp('1.1.1.1'), false);
+  assert.equal(isBlockedIp('93.184.216.34'), false);
+  assert.equal(isBlockedIp('8.8.8.8'), false);
+  assert.equal(isBlockedIp('2606:4700::1'), false);
 });

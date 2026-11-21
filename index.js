@@ -361,8 +361,9 @@ function isDirectEntry(value) {
     if (!/^\d{1,3}$/.test(prefix)) return false;
     const bits = Number(prefix);
     const version = isIP(base);
-    if (version === 4) return bits <= 32;
-    if (version === 6) return bits <= 128;
+    // /0 等于"全部直连"，比错字更危险：它不报错，界面也看不出来。
+    if (version === 4) return bits >= 1 && bits <= 32;
+    if (version === 6) return bits >= 1 && bits <= 128;
     return false;
   }
   if (isIP(value) !== 0) return true;
@@ -397,6 +398,23 @@ function sanitizeHosts(value) {
   return result;
 }
 
+/**
+ * 当前允许参与建配置的节点。
+ *
+ * 关闭「允许不安全节点」时只隐藏，不删除：这个开关是安全偏好，不是数据操作。
+ * 删了之后用户再打开开关也拿不回来，而订阅链接本身不会告诉他少了什么。
+ */
+function activeNodes() {
+  return state.allowInsecure === true
+    ? state.nodes
+    : state.nodes.filter((node) => node.insecure !== true);
+}
+
+/** 因为关闭「允许不安全节点」而被隐藏的节点数。 */
+function countHiddenNodes() {
+  return state.nodes.length - activeNodes().length;
+}
+
 function publicState() {
   return {
     phase: runtime.phase,
@@ -418,10 +436,10 @@ function publicState() {
       format: state.format,
       warnings: state.warnings,
       userinfo: state.userinfo,
-      nodeCount: state.nodes.length,
+      nodeCount: activeNodes().length,
       allowInsecure: state.allowInsecure,
     },
-    nodes: state.nodes.map((node) => ({ name: node.name, type: node.type, insecure: node.insecure === true })),
+    nodes: state.nodes.map((node) => ({ name: node.name, type: node.type, insecure: node.insecure === true, hidden: node.insecure === true && state.allowInsecure !== true })),
     selected: state.selected,
     directHosts: Array.isArray(state.directHosts) ? state.directHosts : [],
   };
@@ -499,6 +517,10 @@ async function handleApi(ctx, req, res) {
 async function dispatch(action, message) {
   if (action === 'state') return { state: publicState() };
   if (action === 'subscribe') {
+    // 掩码串是展示用的，拿它去请求只会拿到 401，然后报一句与真相无关的错。
+    if (typeof message.url === 'string' && message.url.includes('***')) {
+      throw new Error('订阅链接是脱敏后的展示值，请重新填写完整链接');
+    }
     await enqueue(() => updateSubscription(String(message.url ?? '')));
     return { state: publicState() };
   }
@@ -546,15 +568,10 @@ async function dispatch(action, message) {
       const next = message.allowInsecure === true;
       if (next !== state.allowInsecure) {
         state.allowInsecure = next;
-        // 重新应用过滤：关闭开关时立即过滤掉 insecure 节点。
-        if (next === false) {
-          const insecureCount = state.nodes.filter((node) => node.insecure === true).length;
-          if (insecureCount > 0) {
-            state.nodes = state.nodes.filter((node) => node.insecure !== true);
-            if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
-            state.warnings.push(`已按安全策略过滤 ${insecureCount} 个关闭证书校验的节点`);
-            state.warnings = state.warnings.slice(0, 8);
-          }
+        // 不删节点：只提示隐藏了几个，重新打开即可恢复。
+        const hidden = countHiddenNodes();
+        if (next === false && hidden > 0) {
+          state.warnings = [`已隐藏 ${hidden} 个关闭证书校验的节点（重新开启即可恢复）`, ...state.warnings].slice(0, 8);
         }
         await saveState();
       }
@@ -636,6 +653,12 @@ function maskSubscriptionUrl(rawUrl) {
     parsed.hash = parsed.hash === '' ? '' : '#***';
     parsed.username = parsed.username === '' ? '' : '***';
     parsed.password = parsed.password === '' ? '' : '***';
+    // 机场常用 /link/<token>、/api/v1/client/subscribe/<token> 这种路径式令牌，
+    // 只遮 query 等于没遮。常规路径段（api / v1 / client / subscribe）都短于 16。
+    parsed.pathname = parsed.pathname
+      .split('/')
+      .map((segment) => (segment.length >= 16 ? '***' : segment))
+      .join('/');
     return parsed.toString();
   } catch {
     return '';
@@ -722,17 +745,10 @@ async function applySubscription(result, options) {
   state.warnings = [...(result.warnings ?? [])];
   state.updatedAt = new Date().toISOString();
   state.userinfo = options.userinfo ?? null;
-  // 默认拒绝 skip-cert-verify 节点（关闭证书校验，存在中间人风险）。
-  // 仅当用户显式开启 allowInsecure 时才保留这类节点。
-  if (state.allowInsecure !== true) {
-    const insecureCount = state.nodes.filter((node) => node.insecure === true).length;
-    if (insecureCount > 0) {
-      state.nodes = state.nodes.filter((node) => node.insecure !== true);
-      state.warnings.push(`已按安全策略过滤 ${insecureCount} 个关闭证书校验的节点，如需使用请在设置中开启「允许不安全节点」`);
-      state.warnings = state.warnings.slice(0, 8);
-    }
-  }
-  if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
+  // 不在这里删除 insecure 节点：默认策略由 activeNodes() 在建配置时执行，
+  // 这样「允许不安全节点」这个开关才是可逆的 —— 关掉再打开，节点还在。
+  const visible = activeNodes();
+  if (!visible.some((node) => node.name === state.selected)) state.selected = visible[0]?.name ?? '';
   runtime.lastError = null;
   await saveState();
   return publicState();
@@ -815,9 +831,10 @@ async function connectInternal() {
 
     const { mixedPort, apiPort } = await allocatePorts();
     const secret = randomBytes(24).toString('hex');
-    const { hosts, pinned } = await resolveProxyServers(state.nodes, state.hosts);
+    const nodesInUse = activeNodes();
+    const { hosts, pinned } = await resolveProxyServers(nodesInUse, state.hosts);
     if (runtime.disposed) throw new Error('插件已卸载');
-    const { text, group } = buildConfig(state.nodes, {
+    const { text, group } = buildConfig(nodesInUse, {
       mixedPort,
       apiPort,
       secret,
@@ -840,7 +857,7 @@ async function connectInternal() {
     // the core reports "proxy 3: ..." by index only, and by the time that
     // reaches the settings page the connection has already failed and the user
     // has no way to tell which of two hundred nodes is the one to delete.
-    const diagnosis = await diagnoseConfig(corePath, state.nodes);
+    const diagnosis = await diagnoseConfig(corePath, nodesInUse);
     if (runtime.disposed) throw new Error('插件已卸载');
     // The check is interruptible now, so a Disconnect during it has to stop the
     // connect here. Without this the flow would carry on and start a core the
@@ -1085,8 +1102,12 @@ async function failFromCoreExit(generation, detail) {
 }
 
 async function selectNode(name) {
-  const node = state.nodes.find((candidate) => candidate.name === name);
-  if (node === undefined) throw new Error('节点不存在，请刷新订阅');
+  const node = activeNodes().find((candidate) => candidate.name === name);
+  if (node === undefined) {
+    const hidden = state.nodes.find((candidate) => candidate.name === name);
+    if (hidden !== undefined) throw new Error('该节点关闭了证书校验，已按安全策略隐藏；如需使用请先开启「允许不安全节点」');
+    throw new Error('节点不存在，请刷新订阅');
+  }
   if (runtime.connected && runtime.group !== null) {
     await selectOnCore(runtime.group, name);
   }

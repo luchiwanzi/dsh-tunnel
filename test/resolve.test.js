@@ -188,9 +188,9 @@ test('公网 IPv6 仍然正常钉入（安全过滤不误伤功能）', async ()
   const { hosts, pinned } = await pinIpv6OnlyServers(
     [{ server: 'public6.example' }],
     {},
-    { resolve: fakeResolver({ 'public6.example': ['2001:db8::1'] }) },
+    { resolve: fakeResolver({ 'public6.example': ['2606:4700::1'] }) },
   );
-  assert.equal(hosts['public6.example'], '2001:db8::1');
+  assert.equal(hosts['public6.example'], '2606:4700::1');
   assert.equal(pinned.length, 1);
 });
 

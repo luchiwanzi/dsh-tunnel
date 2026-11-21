@@ -131,6 +131,9 @@ test('正常节点 insecure 为 false', () => {
 });
 
 test('保留 Clash hosts 映射', () => {
+  // hosts 的 key 必须就是某个节点的 server：这正是 providers 的真实用法
+  // （伪域名当 server，在这里映射到真实 CDN 域名）。能力没变，只是其余 key
+  // 不再被放行，见下面的 restrictHosts 用例。
   const yaml = [
     'hosts:',
     '  "fake.example": "real.example"',
@@ -151,7 +154,7 @@ test('hosts 过滤原型污染键', () => {
     'hosts:',
     '  "__proto__": "evil"',
     '  "constructor": "evil"',
-    '  "ok": "good"',
+    '  "ok": "1.2.3.4"',
     'proxies:',
     '  - name: n',
     '    type: ss',
@@ -161,7 +164,7 @@ test('hosts 过滤原型污染键', () => {
     '    password: p',
   ].join('\n');
   const result = parseSubscription(yaml);
-  assert.deepEqual(result.hosts, { ok: 'good' });
+  assert.deepEqual(result.hosts, { ok: '1.2.3.4' });
 });
 
 test('空内容抛出异常', () => {
