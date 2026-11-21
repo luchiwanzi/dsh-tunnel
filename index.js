@@ -134,6 +134,8 @@ export function apply(ctx, config = {}) {
   runtime.lastError = null;
   runtime.coreHandle = null;
   runtime.coreAbort = null;
+  runtime.connectAbort = null;
+  runtime.cancelRequested = false;
   runtime.exitState = null;
   runtime.proxyDispose = null;
   runtime.generation = 0;
@@ -1023,6 +1025,8 @@ async function connectInternal() {
     const message = errorMessage(error);
     // 用户自己点的取消不是故障：置 error 会让设置页弹一条红条，
     // 而用户刚刚做的正是「停止」。teardown 已经跑过，这里只需要回到 idle。
+    // 注意顺序：必须在 teardownRuntime() 之前读 cancelled —— teardown 会把
+    // cancelRequested 再次置 true，先读才能拿到"这次连接是否被用户取消"。
     const cancelled = runtime.cancelRequested === true;
     await teardownRuntime();
     runtime.lastError = cancelled ? null : message;
