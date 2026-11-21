@@ -8,7 +8,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
@@ -25,6 +25,7 @@ import {
   CORE_VERSION,
   coreFetch,
   DATA_DIR,
+  LEGACY_DATA_DIR,
   ensureCore,
   ensureGeodata,
   geodataStatus,
@@ -87,6 +88,15 @@ const runtime = {
   coreAbort: null,
   // Aborts the geodata download when the user disconnects mid-connect.
   connectAbort: null,
+  /**
+   * 「用户要求取消」的独立标记。
+   *
+   * 不能在 throwIfCancelled 里只看 connectAbort：teardownRuntime 会先
+   * abort() 再把它置 null，而取消之后连接流程仍在跑 —— 此时
+   * `runtime.connectAbort?.signal.aborted` 得到 undefined，检查变成空操作，
+   * 用户点了取消却照样把内核拉起来。这个标记只由连接流程自己复位。
+   */
+  cancelRequested: false,
   exitState: null,
   proxyDispose: null,
   generation: 0,
@@ -124,6 +134,8 @@ export function apply(ctx, config = {}) {
   runtime.lastError = null;
   runtime.coreHandle = null;
   runtime.coreAbort = null;
+  runtime.connectAbort = null;
+  runtime.cancelRequested = false;
   runtime.exitState = null;
   runtime.proxyDispose = null;
   runtime.generation = 0;
@@ -227,7 +239,8 @@ export function apply(ctx, config = {}) {
             return { ok: true, message: statusMessage() };
           }
           if (action === 'disconnect') {
-            await enqueue(disconnectInternal);
+            // 取消必须插队：连接最长占队列 6 分钟，排队等它跑完就失去了「立即断开」的意义。
+            await disconnectInternal();
             return { ok: true, message: statusMessage() };
           }
           if (action === 'select') {
@@ -251,7 +264,51 @@ export function apply(ctx, config = {}) {
   );
 }
 
+/**
+ * 一次性把 1.1.4 及更早留在包目录里的 state.json 复制到用户数据目录。
+ *
+ * 复制而非移动：迁移中途断电或出错时，旧文件还在，用户最多是"订阅没被
+ * 认出来"，不会"两头都缺一块"。复制失败不阻断 —— 插件照常启动，只是
+ * 订阅为空，用户可以重填。
+ */
+export async function migrateLegacyData() {
+  try {
+    const marker = path.join(DATA_DIR, '.migrated');
+    if (existsSync(marker)) return;
+    const legacyState = path.join(LEGACY_DATA_DIR, 'state.json');
+    if (!existsSync(legacyState)) return;
+    await mkdir(DATA_DIR, { recursive: true });
+
+    // 逐项复制，且不覆盖目标里已有的文件：DSH_TUNNEL_DATA_DIR 可能已经
+    // 指向一个用户亲手配置好的目录，旧包数据绝不能把新数据顶掉。
+    const items = [
+      'state.json',
+      'GeoSite.dat',  // 一并搬走，省去升级后重下 ~27 MB
+      'GeoIP.dat',
+      'mihomo',       // 内核二进制，省去重下 ~22 MB
+    ];
+    for (const name of items) {
+      const from = path.join(LEGACY_DATA_DIR, name);
+      const to = path.join(DATA_DIR, name);
+      if (!existsSync(from)) continue;
+      if (existsSync(to)) continue; // 目标已有，以新数据为准
+      try {
+        await copyFile(from, to);
+      } catch {
+        // 单个文件失败不阻断：缺哪个会由后续流程重新下载。
+      }
+    }
+
+    // marker 只在新目录里没有 state 时写。写失败不重试 —— 否则每次启动
+    // 都会再覆盖一遍目标（尽管上面已有 existsSync(to) 兜底，仍保持幂等）。
+    await writeFile(marker, new Date().toISOString()).catch(() => {});
+  } catch {
+    // 迁移是尽力而为：失败时旧数据仍留在原处，用户可手工处理。
+  }
+}
+
 async function loadState() {
+  await migrateLegacyData();
   await mkdir(DATA_DIR, { recursive: true, mode: 0o700 });
   await chmod(DATA_DIR, 0o700).catch(() => {});
   let raw;
@@ -281,7 +338,9 @@ async function loadState() {
   state.directHosts = Array.isArray(parsed.directHosts)
     ? parsed.directHosts.filter((item) => typeof item === 'string' && item.trim() !== '').slice(0, 200)
     : [];
-  if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
+  // 用 activeNodes()：被安全策略隐藏的节点不能当默认选中项。
+  const loadable = activeNodes();
+  if (!loadable.some((node) => node.name === state.selected)) state.selected = loadable[0]?.name ?? '';
 }
 
 async function saveState() {
@@ -361,8 +420,9 @@ function isDirectEntry(value) {
     if (!/^\d{1,3}$/.test(prefix)) return false;
     const bits = Number(prefix);
     const version = isIP(base);
-    if (version === 4) return bits <= 32;
-    if (version === 6) return bits <= 128;
+    // /0 等于"全部直连"，比错字更危险：它不报错，界面也看不出来。
+    if (version === 4) return bits >= 1 && bits <= 32;
+    if (version === 6) return bits >= 1 && bits <= 128;
     return false;
   }
   if (isIP(value) !== 0) return true;
@@ -397,6 +457,23 @@ function sanitizeHosts(value) {
   return result;
 }
 
+/**
+ * 当前允许参与建配置的节点。
+ *
+ * 关闭「允许不安全节点」时只隐藏，不删除：这个开关是安全偏好，不是数据操作。
+ * 删了之后用户再打开开关也拿不回来，而订阅链接本身不会告诉他少了什么。
+ */
+function activeNodes() {
+  return state.allowInsecure === true
+    ? state.nodes
+    : state.nodes.filter((node) => node.insecure !== true);
+}
+
+/** 因为关闭「允许不安全节点」而被隐藏的节点数。 */
+function countHiddenNodes() {
+  return state.nodes.length - activeNodes().length;
+}
+
 function publicState() {
   return {
     phase: runtime.phase,
@@ -418,28 +495,33 @@ function publicState() {
       format: state.format,
       warnings: state.warnings,
       userinfo: state.userinfo,
-      nodeCount: state.nodes.length,
+      nodeCount: activeNodes().length,
       allowInsecure: state.allowInsecure,
     },
-    nodes: state.nodes.map((node) => ({ name: node.name, type: node.type, insecure: node.insecure === true })),
+    nodes: state.nodes.map((node) => ({ name: node.name, type: node.type, insecure: node.insecure === true, hidden: node.insecure === true && state.allowInsecure !== true })),
     selected: state.selected,
     directHosts: Array.isArray(state.directHosts) ? state.directHosts : [],
   };
 }
 
 function statusMessage() {
+  // 报告的是用户实际能用的节点，不是含隐藏项的总数。
+  const usable = activeNodes();
+  const hiddenNote = countHiddenNodes() > 0 ? `（另有 ${countHiddenNodes()} 个因证书校验被隐藏）` : '';
   const location = state.selected ? `，当前节点 ${state.selected}` : '';
-  const preview = state.nodes.slice(0, 12).map((node) => node.name).join('、');
-  const more = state.nodes.length > 12 ? ` 等 ${state.nodes.length} 个` : '';
+  const preview = usable.slice(0, 12).map((node) => node.name).join('、');
+  const more = usable.length > 12 ? ` 等 ${usable.length} 个` : '';
   const inventory = preview === '' ? '' : `；节点：${preview}${more}`;
   if (runtime.connected) {
     const exit = runtime.exitIp ? `，出口 IP ${runtime.exitIp}` : '';
     return `已连接${location}（本地端口 ${runtime.port}${exit}）${inventory}`;
   }
   if (runtime.phase === 'error' && runtime.lastError) return `未连接：${runtime.lastError}${inventory}`;
-  return state.nodes.length > 0
-    ? `未连接；已保存 ${state.nodes.length} 个节点${location}${inventory}`
-    : '未连接；尚未配置订阅';
+  return usable.length > 0
+    ? `未连接；已保存 ${usable.length} 个节点${location}${inventory}${hiddenNote}`
+    : state.nodes.length > 0
+      ? `未连接；${countHiddenNodes()} 个节点因证书校验被隐藏（开启「允许不安全节点」可用）`
+      : '未连接；尚未配置订阅';
 }
 
 async function handleApi(ctx, req, res) {
@@ -499,6 +581,10 @@ async function handleApi(ctx, req, res) {
 async function dispatch(action, message) {
   if (action === 'state') return { state: publicState() };
   if (action === 'subscribe') {
+    // 掩码串是展示用的，拿它去请求只会拿到 401，然后报一句与真相无关的错。
+    if (typeof message.url === 'string' && message.url.includes('***')) {
+      throw new Error('订阅链接是脱敏后的展示值，请重新填写完整链接');
+    }
     await enqueue(() => updateSubscription(String(message.url ?? '')));
     return { state: publicState() };
   }
@@ -515,7 +601,8 @@ async function dispatch(action, message) {
     return { state: publicState() };
   }
   if (action === 'disconnect') {
-    await enqueue(disconnectInternal);
+    // 取消必须插队：连接最长占队列 6 分钟，排队等它跑完就失去了「立即断开」的意义。
+    await disconnectInternal();
     return { state: publicState() };
   }
   if (action === 'select') {
@@ -546,16 +633,15 @@ async function dispatch(action, message) {
       const next = message.allowInsecure === true;
       if (next !== state.allowInsecure) {
         state.allowInsecure = next;
-        // 重新应用过滤：关闭开关时立即过滤掉 insecure 节点。
-        if (next === false) {
-          const insecureCount = state.nodes.filter((node) => node.insecure === true).length;
-          if (insecureCount > 0) {
-            state.nodes = state.nodes.filter((node) => node.insecure !== true);
-            if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
-            state.warnings.push(`已按安全策略过滤 ${insecureCount} 个关闭证书校验的节点`);
-            state.warnings = state.warnings.slice(0, 8);
-          }
+        // 不删节点：只提示隐藏了几个，重新打开即可恢复。
+        const hidden = countHiddenNodes();
+        if (next === false && hidden > 0) {
+          state.warnings = [`已隐藏 ${hidden} 个关闭证书校验的节点（重新开启即可恢复）`, ...state.warnings].slice(0, 8);
         }
+        // 关掉开关后，原先选中的节点可能正好被隐藏：建配置只用 activeNodes()，
+        // 若不在这里回退，连接时会把内核不认识的名字 PUT 给代理组而失败。
+        const usable = activeNodes();
+        if (!usable.some((node) => node.name === state.selected)) state.selected = usable[0]?.name ?? '';
         await saveState();
       }
     });
@@ -568,6 +654,14 @@ function enqueue(task) {
   const run = taskQueue.then(task, task);
   taskQueue = run.catch(() => {});
   return run;
+}
+
+/** 连接流程每一步后调用：用户断开时立刻停手，不再拉起内核。 */
+function throwIfCancelled() {
+  if (runtime.disposed) throw new Error('插件已卸载');
+  // 只看 cancelRequested：connectAbort 会被 teardown 置 null，靠它判断
+  // 会让取消之后的检查全部失效。
+  if (runtime.cancelRequested === true) throw new Error('连接已取消');
 }
 
 /**
@@ -636,6 +730,21 @@ function maskSubscriptionUrl(rawUrl) {
     parsed.hash = parsed.hash === '' ? '' : '#***';
     parsed.username = parsed.username === '' ? '' : '***';
     parsed.password = parsed.password === '' ? '' : '***';
+    // 机场常用 /link/<token>、/api/v1/client/subscribe/<token> 这种路径式令牌，
+    // 只遮 query 等于没遮。常规路径段（api / v1 / client / subscribe）都短于 12。
+    // 阈值取 12：低于它会把正常短段也遮掉，而短 token（如 /sub/abc123）没有
+    // 无副作用的判定方式，只能接受这一小段不遮。
+    parsed.pathname = parsed.pathname
+      .split('/')
+      .map((segment) => (segment.length >= 12 ? '***' : segment))
+      .join('/');
+    // 主机名里也可能带 token（<token>.sub.example.com）。4 级及以上域名、
+    // 且最左 label 足够长时，遮掉最左 label；正常三级域名不受影响。
+    const labels = parsed.hostname.split('.');
+    if (labels.length >= 4 && labels[0].length >= 6) {
+      labels[0] = '***';
+      parsed.hostname = labels.join('.');
+    }
     return parsed.toString();
   } catch {
     return '';
@@ -722,17 +831,10 @@ async function applySubscription(result, options) {
   state.warnings = [...(result.warnings ?? [])];
   state.updatedAt = new Date().toISOString();
   state.userinfo = options.userinfo ?? null;
-  // 默认拒绝 skip-cert-verify 节点（关闭证书校验，存在中间人风险）。
-  // 仅当用户显式开启 allowInsecure 时才保留这类节点。
-  if (state.allowInsecure !== true) {
-    const insecureCount = state.nodes.filter((node) => node.insecure === true).length;
-    if (insecureCount > 0) {
-      state.nodes = state.nodes.filter((node) => node.insecure !== true);
-      state.warnings.push(`已按安全策略过滤 ${insecureCount} 个关闭证书校验的节点，如需使用请在设置中开启「允许不安全节点」`);
-      state.warnings = state.warnings.slice(0, 8);
-    }
-  }
-  if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
+  // 不在这里删除 insecure 节点：默认策略由 activeNodes() 在建配置时执行，
+  // 这样「允许不安全节点」这个开关才是可逆的 —— 关掉再打开，节点还在。
+  const visible = activeNodes();
+  if (!visible.some((node) => node.name === state.selected)) state.selected = visible[0]?.name ?? '';
   runtime.lastError = null;
   await saveState();
   return publicState();
@@ -767,6 +869,7 @@ async function connectInternal() {
 
   runtime.lastError = null;
   runtime.connectAbort = new AbortController();
+  runtime.cancelRequested = false;
   setPhase('preparing');
   try {
     if (state.nodes.length === 0) {
@@ -774,9 +877,14 @@ async function connectInternal() {
       await updateSubscription(state.subscriptionUrl);
     }
     if (state.nodes.length === 0) throw new Error('订阅中没有可用节点');
+    // 有节点但全被安全策略隐藏时，建出来的配置是空的。这种情况必须说清楚
+    // 原因，否则用户只会看到内核报错，读不出「节点被隐藏了」。
+    if (activeNodes().length === 0) {
+      throw new Error(`当前 ${countHiddenNodes()} 个节点都关闭了证书校验，已被安全策略隐藏；如需使用请开启「允许不安全节点」`);
+    }
 
     const corePath = await ensureCore(configuredCorePath, () => setPhase('downloading'));
-    if (runtime.disposed) throw new Error('插件已卸载');
+    throwIfCancelled();
 
     // The China-direct rules reference GeoSite.dat and GeoIP.dat. A rule whose
     // database is missing stops the core from starting at all, so the databases
@@ -789,7 +897,7 @@ async function connectInternal() {
       },
       signal: runtime.connectAbort?.signal,
     });
-    if (runtime.disposed) throw new Error('插件已卸载');
+    throwIfCancelled();
     const cnDirect = missingGeodata.length === 0;
     if (!cnDirect) {
       // Say it in three places, because each reaches a different reader: the
@@ -815,9 +923,10 @@ async function connectInternal() {
 
     const { mixedPort, apiPort } = await allocatePorts();
     const secret = randomBytes(24).toString('hex');
-    const { hosts, pinned } = await resolveProxyServers(state.nodes, state.hosts);
-    if (runtime.disposed) throw new Error('插件已卸载');
-    const { text, group } = buildConfig(state.nodes, {
+    const nodesInUse = activeNodes();
+    const { hosts, pinned } = await resolveProxyServers(nodesInUse, state.hosts);
+    throwIfCancelled();
+    const { text, group } = buildConfig(nodesInUse, {
       mixedPort,
       apiPort,
       secret,
@@ -834,18 +943,19 @@ async function connectInternal() {
       const logger = hostContext?.logger;
       if (logger && typeof logger.info === 'function') logger.info('tunnel: ' + pinNote);
     }
+    throwIfCancelled();
 
     // Check the file with the core's own parser before starting it for real.
     // This is where a bad node is caught while the node list is still in hand:
     // the core reports "proxy 3: ..." by index only, and by the time that
     // reaches the settings page the connection has already failed and the user
     // has no way to tell which of two hundred nodes is the one to delete.
-    const diagnosis = await diagnoseConfig(corePath, state.nodes);
-    if (runtime.disposed) throw new Error('插件已卸载');
+    const diagnosis = await diagnoseConfig(corePath, nodesInUse);
+    throwIfCancelled();
     // The check is interruptible now, so a Disconnect during it has to stop the
     // connect here. Without this the flow would carry on and start a core the
     // user has just asked to shut down.
-    if (runtime.connectAbort?.signal.aborted === true) throw new Error('连接已取消');
+    throwIfCancelled();
     if (diagnosis !== null) throw new Error(diagnosis);
 
     const abort = new AbortController();
@@ -892,24 +1002,35 @@ async function connectInternal() {
       });
 
     const version = await waitForCore(apiPort, secret, exitState);
-    if (runtime.disposed) throw new Error('插件已卸载');
+    throwIfCancelled();
     runtime.coreVersion = typeof version.version === 'string' ? version.version : CORE_VERSION;
     const groupInfo = await waitForGroup(apiPort, secret, group, exitState);
+    throwIfCancelled();
     if (groupInfo === null || typeof groupInfo !== 'object') throw new Error('mihomo 没有创建代理组');
-    if (state.selected !== '') {
-      await selectOnCore(group, state.selected);
+    // 防御：selected 正常已被 selectNode/setAllowInsecure/loadState 对齐到
+    // activeNodes()，但这里再兜一次，避免把组里不存在的名字 PUT 给内核。
+    const selectedToUse = nodesInUse.some((node) => node.name === state.selected)
+      ? state.selected
+      : (nodesInUse[0]?.name ?? '');
+    if (selectedToUse !== '') {
+      await selectOnCore(group, selectedToUse);
     }
     await installProxy(mixedPort);
-    if (runtime.disposed) throw new Error('插件已卸载');
+    throwIfCancelled();
     runtime.connected = true;
     runtime.exitIp = null;
     setPhase('connected');
     return publicState();
   } catch (error) {
     const message = errorMessage(error);
+    // 用户自己点的取消不是故障：置 error 会让设置页弹一条红条，
+    // 而用户刚刚做的正是「停止」。teardown 已经跑过，这里只需要回到 idle。
+    // 注意顺序：必须在 teardownRuntime() 之前读 cancelled —— teardown 会把
+    // cancelRequested 再次置 true，先读才能拿到"这次连接是否被用户取消"。
+    const cancelled = runtime.cancelRequested === true;
     await teardownRuntime();
-    runtime.lastError = message;
-    setPhase('error');
+    runtime.lastError = cancelled ? null : message;
+    setPhase(cancelled ? 'idle' : 'error');
     throw error;
   }
 }
@@ -974,7 +1095,8 @@ async function diagnoseConfig(corePath, nodes) {
     return `${lines.join('；')}。这些节点无法使用，请更新订阅或重新导入后再试`;
   }
   state.nodes = state.nodes.filter((node) => !badNames.has(node.name));
-  if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
+  const remaining = activeNodes();
+  if (!remaining.some((node) => node.name === state.selected)) state.selected = remaining[0]?.name ?? '';
   const note = `已自动移除 ${badNames.size} 个无法使用的节点（${[...badNames].slice(0, 5).join('、')}${badNames.size > 5 ? ' 等' : ''}），请重新点击连接`;
   state.warnings = [note, ...state.warnings].slice(0, 8);
   runtime.lastError = `${lines.join('；')}。${note}`;
@@ -1017,6 +1139,8 @@ async function disconnectInternal() {
 async function teardownRuntime() {
   runtime.stopping = true;
   runtime.generation += 1;
+  // 记下"用户要求停止"这件事本身，而不是只留下一个会被置空的 AbortSignal。
+  runtime.cancelRequested = true;
   // A disconnect mid-connect must stop the geodata download in its tracks; the
   // fetch aborts and ensureGeodata returns its missing list immediately.
   if (runtime.connectAbort !== null) {
@@ -1085,8 +1209,12 @@ async function failFromCoreExit(generation, detail) {
 }
 
 async function selectNode(name) {
-  const node = state.nodes.find((candidate) => candidate.name === name);
-  if (node === undefined) throw new Error('节点不存在，请刷新订阅');
+  const node = activeNodes().find((candidate) => candidate.name === name);
+  if (node === undefined) {
+    const hidden = state.nodes.find((candidate) => candidate.name === name);
+    if (hidden !== undefined) throw new Error('该节点关闭了证书校验，已按安全策略隐藏；如需使用请先开启「允许不安全节点」');
+    throw new Error('节点不存在，请刷新订阅');
+  }
   if (runtime.connected && runtime.group !== null) {
     await selectOnCore(runtime.group, name);
   }
@@ -1112,7 +1240,9 @@ async function measureLatency(name) {
     const delay = await delayFor(name.trim());
     return { results: { [name.trim()]: delay } };
   }
-  const names = state.nodes.map((node) => node.name).slice(0, 80);
+  // 只测能用的节点：隐藏节点在内核的组里根本不存在，测了只会全部返回 null。
+  const usable = activeNodes();
+  const names = usable.map((node) => node.name).slice(0, 80);
   const results = {};
   let cursor = 0;
   const workers = Array.from({ length: 4 }, async () => {
@@ -1126,7 +1256,7 @@ async function measureLatency(name) {
     }
   });
   await Promise.all(workers);
-  return { results, tested: names.length, total: state.nodes.length };
+  return { results, tested: names.length, total: usable.length };
 }
 
 async function delayFor(name) {
