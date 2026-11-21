@@ -1,1 +1,216 @@
-aW1wb3J0IHsgdGVzdCB9IGZyb20gJ25vZGU6dGVzdCc7CmltcG9ydCBhc3NlcnQgZnJvbSAnbm9kZTphc3NlcnQvc3RyaWN0JzsKaW1wb3J0IHsgcGFyc2VTdWJzY3JpcHRpb24sIHBhcnNlVXNlcmluZm8gfSBmcm9tICcuLi9saWIvc3Vic2NyaXB0aW9uLmpzJzsKCi8vIOWfuuehgOW3peWFt++8muaKiuS4gOS4qiBVUkkg6IqC54K55YyF5oiQ6K6i6ZiF5paH5pysCmZ1bmN0aW9uIHVyaUxpc3QoLi4udXJpcykgewogIHJldHVybiB1cmlzLmpvaW4oJ1xuJyk7Cn0KCnRlc3QoJ3BhcnNlVXNlcmluZm8g6Kej5p6Q5ZCI5rOV5aS06YOoJywgKCkgPT4gewogIGNvbnN0IGluZm8gPSBwYXJzZVVzZXJpbmZvKCd1cGxvYWQ9MTAwMDsgZG93bmxvYWQ9MjAwMDsgdG90YWw9MzAwMDsgZXhwaXJlPTE3MDAwMDAwMDAnKTsKICBhc3NlcnQuZGVlcEVxdWFsKGluZm8sIHsgdXBsb2FkOiAxMDAwLCBkb3dubG9hZDogMjAwMCwgdG90YWw6IDMwMDAsIGV4cGlyZTogMTcwMDAwMDAwMCB9KTsKfSk7Cgp0ZXN0KCdwYXJzZVVzZXJpbmZvIOW/veeVpemdnuazlemUruWSjOi0n+aVsCcsICgpID0+IHsKICBjb25zdCBpbmZvID0gcGFyc2VVc2VyaW5mbygndXBsb2FkPS0xOyBmb289MTIzOyB0b3RhbD01MDAnKTsKICBhc3NlcnQuZGVlcEVxdWFsKGluZm8sIHsgdG90YWw6IDUwMCB9KTsKfSk7Cgp0ZXN0KCdwYXJzZVVzZXJpbmZvIOepuuWAvOi/lOWbniBudWxsJywgKCkgPT4gewogIGFzc2VydC5lcXVhbChwYXJzZVVzZXJpbmZvKCcnKSwgbnVsbCk7CiAgYXNzZXJ0LmVxdWFsKHBhcnNlVXNlcmluZm8obnVsbCksIG51bGwpOwp9KTsKCnRlc3QoJ+ino+aekCBTUyDoioLngrknLCAoKSA9PiB7CiAgY29uc3QgYjY0ID0gQnVmZmVyLmZyb20oJ2Flcy0xMjgtZ2NtOnNlY3JldDEyM0BleGFtcGxlLmNvbTo4Mzg4JykudG9TdHJpbmcoJ2Jhc2U2NCcpOwogIGNvbnN0IHVyaSA9ICdzczovLycgKyBiNjQgKyAnI+aIkeeahOiKgueCuSc7CiAgY29uc3QgcmVzdWx0ID0gcGFyc2VTdWJzY3JpcHRpb24odXJpTGlzdCh1cmkpKTsKICBhc3NlcnQuZXF1YWwocmVzdWx0Lm5vZGVzLmxlbmd0aCwgMSk7CiAgY29uc3Qgbm9kZSA9IHJlc3VsdC5ub2Rlc1swXTsKICBhc3NlcnQuZXF1YWwobm9kZS50eXBlLCAnc3MnKTsKICBhc3NlcnQuZXF1YWwobm9kZS5zZXJ2ZXIsICdleGFtcGxlLmNvbScpOwogIGFzc2VydC5lcXVhbChub2RlLnBvcnQsIDgzODgpOwogIGFzc2VydC5lcXVhbChub2RlLmNpcGhlciwgJ2Flcy0xMjgtZ2NtJyk7CiAgYXNzZXJ0LmVxdWFsKG5vZGUucGFzc3dvcmQsICdzZWNyZXQxMjMnKTsKICBhc3NlcnQuZXF1YWwobm9kZS5uYW1lLCAn5oiR55qE6IqC54K5Jyk7Cn0pOwoKdGVzdCgn6Kej5p6QIHRyb2phbiDoioLngrnlubbpu5jorqTnq6/lj6MgNDQzJywgKCkgPT4gewogIGNvbnN0IHVyaSA9ICd0cm9qYW46Ly9wYXNzd29yZEBleGFtcGxlLmNvbSN0cm9qYW4tbm9kZSc7CiAgY29uc3QgcmVzdWx0ID0gcGFyc2VTdWJzY3JpcHRpb24odXJpTGlzdCh1cmkpKTsKICBjb25zdCBub2RlID0gcmVzdWx0Lm5vZGVzWzBdOwogIGFzc2VydC5lcXVhbChub2RlLnR5cGUsICd0cm9qYW4nKTsKICBhc3NlcnQuZXF1YWwobm9kZS5wb3J0LCA0NDMpOwogIGFzc2VydC5lcXVhbChub2RlLnBhc3N3b3JkLCAncGFzc3dvcmQnKTsKfSk7Cgp0ZXN0KCfop6PmnpAgc29ja3M1IOiKgueCuScsICgpID0+IHsKICBjb25zdCB1cmkgPSAnc29ja3M1Oi8vdXNlcjpwYXNzQGV4YW1wbGUuY29tOjEwODAjc29ja3MnOwogIGNvbnN0IHJlc3VsdCA9IHBhcnNlU3Vic2NyaXB0aW9uKHVyaUxpc3QodXJpKSk7CiAgY29uc3Qgbm9kZSA9IHJlc3VsdC5ub2Rlc1swXTsKICBhc3NlcnQuZXF1YWwobm9kZS50eXBlLCAnc29ja3M1Jyk7CiAgYXNzZXJ0LmVxdWFsKG5vZGUudXNlcm5hbWUsICd1c2VyJyk7CiAgYXNzZXJ0LmVxdWFsKG5vZGUucGFzc3dvcmQsICdwYXNzJyk7Cn0pOwoKdGVzdCgn6Kej5p6QIGh0dHAg6IqC54K56buY6K6k56uv5Y+jJywgKCkgPT4gewogIGNvbnN0IHJlc3VsdCA9IHBhcnNlU3Vic2NyaXB0aW9uKHVyaUxpc3QoJ2h0dHA6Ly9leGFtcGxlLmNvbSNodHRwLW5vZGUnKSk7CiAgY29uc3Qgbm9kZSA9IHJlc3VsdC5ub2Rlc1swXTsKICBhc3NlcnQuZXF1YWwobm9kZS50eXBlLCAnaHR0cCcpOwogIGFzc2VydC5lcXVhbChub2RlLnBvcnQsIDgwKTsKfSk7Cgp0ZXN0KCfop6PmnpAgQ2xhc2ggWUFNTCDnmoQgcHJveGllcyDliJfooagnLCAoKSA9PiB7CiAgY29uc3QgeWFtbCA9IFsKICAgICdwcm94aWVzOicsCiAgICAnICAtIG5hbWU6IG5vZGUxJywKICAgICcgICAgdHlwZTogc3MnLAogICAgJyAgICBzZXJ2ZXI6IGV4YW1wbGUuY29tJywKICAgICcgICAgcG9ydDogNDQzJywKICAgICcgICAgY2lwaGVyOiBhZXMtMjU2LWdjbScsCiAgICAnICAgIHBhc3N3b3JkOiBwYXNzMTIzJywKICBdLmpvaW4oJ1xuJyk7CiAgY29uc3QgcmVzdWx0ID0gcGFyc2VTdWJzY3JpcHRpb24oeWFtbCk7CiAgYXNzZXJ0LmVxdWFsKHJlc3VsdC5mb3JtYXQsICdjbGFzaCcpOwogIGFzc2VydC5lcXVhbChyZXN1bHQubm9kZXMubGVuZ3RoLCAxKTsKICBhc3NlcnQuZXF1YWwocmVzdWx0Lm5vZGVzWzBdLm5hbWUsICdub2RlMScpOwp9KTsKCnRlc3QoJ+i3s+i/h+e8uuWwkeW/heimgeWtl+auteeahOiKgueCuScsICgpID0+IHsKICBjb25zdCB5YW1sID0gWwogICAgJ3Byb3hpZXM6JywKICAgICcgIC0gbmFtZTogYmFkJywKICAgICcgICAgdHlwZTogc3MnLAogICAgJyAgICBzZXJ2ZXI6IGV4YW1wbGUuY29tJywKICAgICcgIC0gbmFtZTogZ29vZCcsCiAgICAnICAgIHR5cGU6IHNzJywKICAgICcgICAgc2VydmVyOiBleGFtcGxlLmNvbScsCiAgICAnICAgIHBvcnQ6IDQ0MycsCiAgICAnICAgIGNpcGhlcjogYWVzLTI1Ni1nY20nLAogICAgJyAgICBwYXNzd29yZDogcGFzcycsCiAgXS5qb2luKCdcbicpOwogIGNvbnN0IHJlc3VsdCA9IHBhcnNlU3Vic2NyaXB0aW9uKHlhbWwpOwogIGFzc2VydC5lcXVhbChyZXN1bHQubm9kZXMubGVuZ3RoLCAxKTsKICBhc3NlcnQuZXF1YWwocmVzdWx0Lm5vZGVzWzBdLm5hbWUsICdnb29kJyk7CiAgLy8gVGhlIHNlbnRlbmNlIG5hbWVzIHRoZSBmaWVsZCB0aGF0IHdhcyBhY3R1YWxseSB3cm9uZzogYSBub2RlIG1pc3Npbmcgb25seQogIC8vIGl0cyBwb3J0IGlzIGEgZGlmZmVyZW50IHByb2JsZW0gZnJvbSBvbmUgc3BlYWtpbmcgYW4gdW5zdXBwb3J0ZWQgcHJvdG9jb2wsCiAgLy8gYW5kIHRoZSBvbGQgc2hhcmVkICLnvLrlsJHlv4XopoHlrZfmrrUiIGxpbmUgY291bGQgbm90IHRlbGwgdGhlbSBhcGFydC4KICBhc3NlcnQub2socmVzdWx0Lndhcm5pbmdzLnNvbWUoKHcpID0+IHcuaW5jbHVkZXMoJ+W3sui3s+i/hycpICYmIHcuaW5jbHVkZXMoJ3NzJykgJiYgdy5pbmNsdWRlcygncG9ydCcpKSk7Cn0pOwoKdGVzdCgnc2tpcC1jZXJ0LXZlcmlmeSDoioLngrnooqvmoIforrDkuLogaW5zZWN1cmUnLCAoKSA9PiB7CiAgY29uc3QgeWFtbCA9IFsKICAgICdwcm94aWVzOicsCiAgICAnICAtIG5hbWU6IGluc2VjdXJlLW5vZGUnLAogICAgJyAgICB0eXBlOiB2bWVzcycsCiAgICAnICAgIHNlcnZlcjogZXhhbXBsZS5jb20nLAogICAgJyAgICBwb3J0OiA0NDMnLAogICAgJyAgICB1dWlkOiBhYmMnLAogICAgJyAgICB0bHM6IHRydWUnLAogICAgJyAgICBza2lwLWNlcnQtdmVyaWZ5OiB0cnVlJywKICBdLmpvaW4oJ1xuJyk7CiAgY29uc3QgcmVzdWx0ID0gcGFyc2VTdWJzY3JpcHRpb24oeWFtbCk7CiAgYXNzZXJ0LmVxdWFsKHJlc3VsdC5ub2Rlcy5sZW5ndGgsIDEpOwogIGFzc2VydC5lcXVhbChyZXN1bHQubm9kZXNbMF0uaW5zZWN1cmUsIHRydWUpOwogIGFzc2VydC5vayhyZXN1bHQud2FybmluZ3Muc29tZSgodykgPT4gdy5pbmNsdWRlcygn6K+B5Lmm5qCh6aqMJykpKTsKfSk7Cgp0ZXN0KCfmraPluLjoioLngrkgaW5zZWN1cmUg5Li6IGZhbHNlJywgKCkgPT4gewogIGNvbnN0IHlhbWwgPSBbCiAgICAncHJveGllczonLAogICAgJyAgLSBuYW1lOiBzZWN1cmUtbm9kZScsCiAgICAnICAgIHR5cGU6IHNzJywKICAgICcgICAgc2VydmVyOiBleGFtcGxlLmNvbScsCiAgICAnICAgIHBvcnQ6IDQ0MycsCiAgICAnICAgIGNpcGhlcjogYWVzLTI1Ni1nY20nLAogICAgJyAgICBwYXNzd29yZDogcGFzcycsCiAgXS5qb2luKCdcbicpOwogIGNvbnN0IHJlc3VsdCA9IHBhcnNlU3Vic2NyaXB0aW9uKHlhbWwpOwogIGFzc2VydC5lcXVhbChyZXN1bHQubm9kZXNbMF0uaW5zZWN1cmUsIGZhbHNlKTsKfSk7Cgp0ZXN0KCfkv53nlZkgQ2xhc2ggaG9zdHMg5pig5bCEJywgKCkgPT4gewogIGNvbnN0IHlhbWwgPSBbCiAgICAnaG9zdHM6JywKICAgICcgICJmYWtlLmV4YW1wbGUiOiAicmVhbC5leGFtcGxlIicsCiAgICAncHJveGllczonLAogICAgJyAgLSBuYW1lOiBuJywKICAgICcgICAgdHlwZTogc3MnLAogICAgJyAgICBzZXJ2ZXI6IGZha2UuZXhhbXBsZScsCiAgICAnICAgIHBvcnQ6IDQ0MycsCiAgICAnICAgIGNpcGhlcjogYWVzLTI1Ni1nY20nLAogICAgJyAgICBwYXNzd29yZDogcCcsCiAgXS5qb2luKCdcbicpOwogIGNvbnN0IHJlc3VsdCA9IHBhcnNlU3Vic2NyaXB0aW9uKHlhbWwpOwogIGFzc2VydC5kZWVwRXF1YWwocmVzdWx0Lmhvc3RzLCB7ICdmYWtlLmV4YW1wbGUnOiAncmVhbC5leGFtcGxlJyB9KTsKfSk7Cgp0ZXN0KCdob3N0cyDov4fmu6Tljp/lnovmsaHmn5PplK4nLCAoKSA9PiB7CiAgY29uc3QgeWFtbCA9IFsKICAgICdob3N0czonLAogICAgJyAgIl9fcHJvdG9fXyI6ICJldmlsIicsCiAgICAnICAiY29uc3RydWN0b3IiOiAiZXZpbCInLAogICAgJyAgIm9rIjogImdvb2QiJywKICAgICdwcm94aWVzOicsCiAgICAnICAtIG5hbWU6IG4nLAogICAgJyAgICB0eXBlOiBzcycsCiAgICAnICAgIHNlcnZlcjogb2snLAogICAgJyAgICBwb3J0OiA0NDMnLAogICAgJyAgICBjaXBoZXI6IGFlcy0yNTYtZ2NtJywKICAgICcgICAgcGFzc3dvcmQ6IHAnLAogIF0uam9pbignXG4nKTsKICBjb25zdCByZXN1bHQgPSBwYXJzZVN1YnNjcmlwdGlvbih5YW1sKTsKICBhc3NlcnQuZGVlcEVxdWFsKHJlc3VsdC5ob3N0cywgeyBvazogJ2dvb2QnIH0pOwp9KTsKCnRlc3QoJ+epuuWGheWuueaKm+WHuuW8guW4uCcsICgpID0+IHsKICBhc3NlcnQudGhyb3dzKCgpID0+IHBhcnNlU3Vic2NyaXB0aW9uKCcnKSwgL+mFjee9ruWGheWuueS4uuepui8pOwogIGFzc2VydC50aHJvd3MoKCkgPT4gcGFyc2VTdWJzY3JpcHRpb24oJyAgICcpLCAv6YWN572u5YaF5a655Li656m6Lyk7Cn0pOwoKdGVzdCgn5peg5rOV6K+G5Yir55qE5qC85byP5oqb5Ye65byC5bi4JywgKCkgPT4gewogIGFzc2VydC50aHJvd3MoKCkgPT4gcGFyc2VTdWJzY3JpcHRpb24oJ3RoaXMgaXMgbm90IGEgc3Vic2NyaXB0aW9uJyksIC/ml6Dms5Xor4bliKvlhoXlrrnmoLzlvI8vKTsKfSk7Cgp0ZXN0KCfnq6/lj6PojIPlm7TmoKHpqownLCAoKSA9PiB7CiAgY29uc3QgYmFkID0gdXJpTGlzdCgnc29ja3M1Oi8vZXhhbXBsZS5jb206OTk5OTkjYmFkJyk7CiAgYXNzZXJ0LnRocm93cygoKSA9PiBwYXJzZVN1YnNjcmlwdGlvbihiYWQpLCAv5peg5rOV6K+G5Yir5YaF5a655qC85byPfOayoeacieWPr+eUqOiKgueCuS8pOwp9KTt0ZXN0KCfmnKrnn6XoioLngrnnsbvlnovlnKjop6PmnpDmnJ/ooqvliZTpmaTlubbnu5nlh7rlj6/or7vorablkYonLCAoKSA9PiB7CiAgY29uc3QgeWFtbCA9IFsKICAgICdwcm94aWVzOicsCiAgICAnICAtIG5hbWU6IOmmmea4ryAwMScsCiAgICAnICAgIHR5cGU6IHNzJywKICAgICcgICAgc2VydmVyOiAxLjIuMy40JywKICAgICcgICAgcG9ydDogNDQzJywKICAgICcgICAgY2lwaGVyOiBhZXMtMTI4LWdjbScsCiAgICAnICAgIHBhc3N3b3JkOiBwJywKICAgICcgIC0gbmFtZTog5pyq5p2l5Y2P6K6uJywKICAgICcgICAgdHlwZTogcXVhc2ltb2RvJywKICAgICcgICAgc2VydmVyOiA1LjYuNy44JywKICAgICcgICAgcG9ydDogNDQzJywKICBdLmpvaW4oJ1xuJyk7CiAgY29uc3QgcmVzdWx0ID0gcGFyc2VTdWJzY3JpcHRpb24oeWFtbCk7CiAgYXNzZXJ0LmVxdWFsKHJlc3VsdC5ub2Rlcy5sZW5ndGgsIDEpOwogIGFzc2VydC5lcXVhbChyZXN1bHQubm9kZXNbMF0ubmFtZSwgJ+mmmea4ryAwMScpOwogIGNvbnN0IHdhcm5pbmcgPSByZXN1bHQud2FybmluZ3Muam9pbignICcpOwogIC8vIFRoZSB0eXBlIGFuZCB0aGUgbm9kZSBuYW1lIGJvdGggaGF2ZSB0byBhcHBlYXI6IHRoZSBvbGQgbWVzc2FnZSBzYWlkIG9ubHkKICAvLyB0aGF0IHNvbWV0aGluZyB3YXMgc2tpcHBlZCwgd2hpY2ggbGVmdCB0aGUgdXNlciB3aXRoIG5vIHdheSB0byBmaW5kIGl0LgogIGFzc2VydC5vayh3YXJuaW5nLmluY2x1ZGVzKCdxdWFzaW1vZG8nKSwgd2FybmluZyk7CiAgYXNzZXJ0Lm9rKHdhcm5pbmcuaW5jbHVkZXMoJ+acquadpeWNj+iuricpLCB3YXJuaW5nKTsKfSk7Cgp0ZXN0KCflhajpg6joioLngrnnsbvlnovpg73kuI3mlK/mjIHml7bvvIzlvILluLjkv6Hmga/or7TmmI7ljp/lm6AnLCAoKSA9PiB7CiAgY29uc3QgeWFtbCA9IFsncHJveGllczonLCAnICAtIHtuYW1lOiBhLCB0eXBlOiBxdWFzaW1vZG8sIHNlcnZlcjogMS4yLjMuNCwgcG9ydDogNDQzfSddLmpvaW4oJ1xuJyk7CiAgYXNzZXJ0LnRocm93cygKICAgICgpID0+IHBhcnNlU3Vic2NyaXB0aW9uKHlhbWwpLAogICAgKGVycm9yKSA9PiBlcnJvci5tZXNzYWdlLmluY2x1ZGVzKCdxdWFzaW1vZG8nKSwKICApOwp9KTsKCnRlc3QoJ+aUr+aMgeeahOWNj+iuruexu+Wei+S4jeiiq+ivr+WJlOmZpCcsICgpID0+IHsKICBjb25zdCB0eXBlcyA9IFsnc3MnLCAndm1lc3MnLCAndmxlc3MnLCAndHJvamFuJywgJ2h5c3RlcmlhMicsICd0dWljJywgJ3NvY2tzNScsICdodHRwJywgJ2FueXRscycsICdtaWVydSddOwogIGNvbnN0IHlhbWwgPSBbJ3Byb3hpZXM6JywgLi4udHlwZXMubWFwKCh0eXBlLCBpbmRleCkgPT4gYCAgLSB7bmFtZTogbiR7aW5kZXh9LCB0eXBlOiAke3R5cGV9LCBzZXJ2ZXI6IDEuMi4zLiR7aW5kZXggKyAxfSwgcG9ydDogNDQzfWApXS5qb2luKCdcbicpOwogIGNvbnN0IHJlc3VsdCA9IHBhcnNlU3Vic2NyaXB0aW9uKHlhbWwpOwogIGFzc2VydC5lcXVhbChyZXN1bHQubm9kZXMubGVuZ3RoLCB0eXBlcy5sZW5ndGgpOwp9KTsK
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { parseSubscription, parseUserinfo } from '../lib/subscription.js';
+
+// 基础工具：把一个 URI 节点包成订阅文本
+function uriList(...uris) {
+  return uris.join('\n');
+}
+
+test('parseUserinfo 解析合法头部', () => {
+  const info = parseUserinfo('upload=1000; download=2000; total=3000; expire=1700000000');
+  assert.deepEqual(info, { upload: 1000, download: 2000, total: 3000, expire: 1700000000 });
+});
+
+test('parseUserinfo 忽略非法键和负数', () => {
+  const info = parseUserinfo('upload=-1; foo=123; total=500');
+  assert.deepEqual(info, { total: 500 });
+});
+
+test('parseUserinfo 空值返回 null', () => {
+  assert.equal(parseUserinfo(''), null);
+  assert.equal(parseUserinfo(null), null);
+});
+
+test('解析 SS 节点', () => {
+  const b64 = Buffer.from('aes-128-gcm:secret123@example.com:8388').toString('base64');
+  const uri = 'ss://' + b64 + '#我的节点';
+  const result = parseSubscription(uriList(uri));
+  assert.equal(result.nodes.length, 1);
+  const node = result.nodes[0];
+  assert.equal(node.type, 'ss');
+  assert.equal(node.server, 'example.com');
+  assert.equal(node.port, 8388);
+  assert.equal(node.cipher, 'aes-128-gcm');
+  assert.equal(node.password, 'secret123');
+  assert.equal(node.name, '我的节点');
+});
+
+test('解析 trojan 节点并默认端口 443', () => {
+  const uri = 'trojan://password@example.com#trojan-node';
+  const result = parseSubscription(uriList(uri));
+  const node = result.nodes[0];
+  assert.equal(node.type, 'trojan');
+  assert.equal(node.port, 443);
+  assert.equal(node.password, 'password');
+});
+
+test('解析 socks5 节点', () => {
+  const uri = 'socks5://user:pass@example.com:1080#socks';
+  const result = parseSubscription(uriList(uri));
+  const node = result.nodes[0];
+  assert.equal(node.type, 'socks5');
+  assert.equal(node.username, 'user');
+  assert.equal(node.password, 'pass');
+});
+
+test('解析 http 节点默认端口', () => {
+  const result = parseSubscription(uriList('http://example.com#http-node'));
+  const node = result.nodes[0];
+  assert.equal(node.type, 'http');
+  assert.equal(node.port, 80);
+});
+
+test('解析 Clash YAML 的 proxies 列表', () => {
+  const yaml = [
+    'proxies:',
+    '  - name: node1',
+    '    type: ss',
+    '    server: example.com',
+    '    port: 443',
+    '    cipher: aes-256-gcm',
+    '    password: pass123',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  assert.equal(result.format, 'clash');
+  assert.equal(result.nodes.length, 1);
+  assert.equal(result.nodes[0].name, 'node1');
+});
+
+test('跳过缺少必要字段的节点', () => {
+  const yaml = [
+    'proxies:',
+    '  - name: bad',
+    '    type: ss',
+    '    server: example.com',
+    '  - name: good',
+    '    type: ss',
+    '    server: example.com',
+    '    port: 443',
+    '    cipher: aes-256-gcm',
+    '    password: pass',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  assert.equal(result.nodes.length, 1);
+  assert.equal(result.nodes[0].name, 'good');
+  // The sentence names the field that was actually wrong: a node missing only
+  // its port is a different problem from one speaking an unsupported protocol,
+  // and the old shared "缺少必要字段" line could not tell them apart.
+  assert.ok(result.warnings.some((w) => w.includes('已跳过') && w.includes('ss') && w.includes('port')));
+});
+
+test('skip-cert-verify 节点被标记为 insecure', () => {
+  const yaml = [
+    'proxies:',
+    '  - name: insecure-node',
+    '    type: vmess',
+    '    server: example.com',
+    '    port: 443',
+    '    uuid: abc',
+    '    tls: true',
+    '    skip-cert-verify: true',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  assert.equal(result.nodes.length, 1);
+  assert.equal(result.nodes[0].insecure, true);
+  assert.ok(result.warnings.some((w) => w.includes('证书校验')));
+});
+
+test('正常节点 insecure 为 false', () => {
+  const yaml = [
+    'proxies:',
+    '  - name: secure-node',
+    '    type: ss',
+    '    server: example.com',
+    '    port: 443',
+    '    cipher: aes-256-gcm',
+    '    password: pass',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  assert.equal(result.nodes[0].insecure, false);
+});
+
+test('保留 Clash hosts 映射', () => {
+  const yaml = [
+    'hosts:',
+    '  "fake.example": "real.example"',
+    'proxies:',
+    '  - name: n',
+    '    type: ss',
+    '    server: fake.example',
+    '    port: 443',
+    '    cipher: aes-256-gcm',
+    '    password: p',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  assert.deepEqual(result.hosts, { 'fake.example': 'real.example' });
+});
+
+test('hosts 过滤原型污染键', () => {
+  const yaml = [
+    'hosts:',
+    '  "__proto__": "evil"',
+    '  "constructor": "evil"',
+    '  "ok": "good"',
+    'proxies:',
+    '  - name: n',
+    '    type: ss',
+    '    server: ok',
+    '    port: 443',
+    '    cipher: aes-256-gcm',
+    '    password: p',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  assert.deepEqual(result.hosts, { ok: 'good' });
+});
+
+test('空内容抛出异常', () => {
+  assert.throws(() => parseSubscription(''), /配置内容为空/);
+  assert.throws(() => parseSubscription('   '), /配置内容为空/);
+});
+
+test('无法识别的格式抛出异常', () => {
+  assert.throws(() => parseSubscription('this is not a subscription'), /无法识别内容格式/);
+});
+
+test('端口范围校验', () => {
+  const bad = uriList('socks5://example.com:99999#bad');
+  assert.throws(() => parseSubscription(bad), /无法识别内容格式|没有可用节点/);
+});test('未知节点类型在解析期被剔除并给出可读警告', () => {
+  const yaml = [
+    'proxies:',
+    '  - name: 香港 01',
+    '    type: ss',
+    '    server: 1.2.3.4',
+    '    port: 443',
+    '    cipher: aes-128-gcm',
+    '    password: p',
+    '  - name: 未来协议',
+    '    type: quasimodo',
+    '    server: 5.6.7.8',
+    '    port: 443',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  assert.equal(result.nodes.length, 1);
+  assert.equal(result.nodes[0].name, '香港 01');
+  const warning = result.warnings.join(' ');
+  // The type and the node name both have to appear: the old message said only
+  // that something was skipped, which left the user with no way to find it.
+  assert.ok(warning.includes('quasimodo'), warning);
+  assert.ok(warning.includes('未来协议'), warning);
+});
+
+test('全部节点类型都不支持时，异常信息说明原因', () => {
+  const yaml = ['proxies:', '  - {name: a, type: quasimodo, server: 1.2.3.4, port: 443}'].join('\n');
+  assert.throws(
+    () => parseSubscription(yaml),
+    (error) => error.message.includes('quasimodo'),
+  );
+});
+
+test('支持的协议类型不被误剔除', () => {
+  const types = ['ss', 'vmess', 'vless', 'trojan', 'hysteria2', 'tuic', 'socks5', 'http', 'anytls', 'mieru'];
+  const yaml = ['proxies:', ...types.map((type, index) => `  - {name: n${index}, type: ${type}, server: 1.2.3.${index + 1}, port: 443}`)].join('\n');
+  const result = parseSubscription(yaml);
+  assert.equal(result.nodes.length, types.length);
+});
