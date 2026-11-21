@@ -15,7 +15,7 @@ import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { parseSubscription, parseUserinfo } from './lib/subscription.js';
+import { needsEndpoint, parseSubscription, parseUserinfo } from './lib/subscription.js';
 import { pinnedFetchAny } from './lib/pinned-fetch.js';
 import { normalizeForVisit, resolveRedirect } from './lib/redirect-policy.js';
 import { assertSafeTarget } from './lib/ssrf-guard.js';
@@ -35,6 +35,9 @@ import {
   waitForCore,
   waitForGroup,
   writeConfig,
+  testConfig,
+  describeCoreProblem,
+  makeConfigRunner,
 } from './lib/mihomo.js';
 
 const API_PATH = '/dsh-tunnel/api';
@@ -319,8 +322,7 @@ function isStoredNode(node) {
     typeof node.name === 'string' &&
     node.name !== '' &&
     typeof node.type === 'string' &&
-    typeof node.server === 'string' &&
-    Number.isInteger(node.port)
+    (!needsEndpoint(node.type) || (typeof node.server === 'string' && Number.isInteger(node.port)))
   );
 }
 
@@ -833,6 +835,19 @@ async function connectInternal() {
       if (logger && typeof logger.info === 'function') logger.info('tunnel: ' + pinNote);
     }
 
+    // Check the file with the core's own parser before starting it for real.
+    // This is where a bad node is caught while the node list is still in hand:
+    // the core reports "proxy 3: ..." by index only, and by the time that
+    // reaches the settings page the connection has already failed and the user
+    // has no way to tell which of two hundred nodes is the one to delete.
+    const diagnosis = await diagnoseConfig(corePath, state.nodes);
+    if (runtime.disposed) throw new Error('插件已卸载');
+    // The check is interruptible now, so a Disconnect during it has to stop the
+    // connect here. Without this the flow would carry on and start a core the
+    // user has just asked to shut down.
+    if (runtime.connectAbort?.signal.aborted === true) throw new Error('连接已取消');
+    if (diagnosis !== null) throw new Error(diagnosis);
+
     const abort = new AbortController();
     const exitState = { exited: false, detail: '' };
     const generation = ++runtime.generation;
@@ -897,6 +912,78 @@ async function connectInternal() {
     setPhase('error');
     throw error;
   }
+}
+
+/**
+ * Ask the core to check the generated file, and turn a rejection into advice.
+ *
+ * Returns `null` when the file is good. Otherwise returns a message that says
+ * which nodes are at fault and what happens to them, after removing those nodes
+ * from the saved subscription so the next Connect succeeds.
+ *
+ * The removal is the point. A user cannot edit an individual node in the
+ * settings page, and re-importing the whole subscription to drop one bad entry
+ * is not a reasonable thing to ask. Since the subscription is regenerated
+ * wholesale on update, dropping the unusable entries from *the stored copy* is
+ * both safe and self-healing: updating the subscription brings them back, and
+ * if the provider fixes them they work again.
+ *
+ * @param {string} corePath
+ * @param {{ name?: string, type?: string }[]} nodes
+ * @returns {Promise<string | null>}
+ */
+async function diagnoseConfig(corePath, nodes) {
+  if (!Array.isArray(nodes) || nodes.length === 0) return null;
+  let result;
+  try {
+    const service = hostContext?.subprocess;
+    const runner = typeof service?.spawn === 'function'
+      ? makeConfigRunner(service, { env: { HOME: DATA_DIR, TMPDIR: DATA_DIR } })
+      : undefined;
+    result = await testConfig(corePath, { runner, signal: runtime.connectAbort?.signal });
+  } catch (error) {
+    // The check itself failing must never replace the real error path: fall
+    // through to a normal start and let the core report whatever it reports.
+    const logger = hostContext?.logger;
+    if (logger && typeof logger.warn === 'function') logger.warn('tunnel: 配置自检不可用，跳过：' + errorMessage(error));
+    return null;
+  }
+  if (result.ok) return null;
+  if (result.problems.length === 0) {
+    // Rejected for a reason the parser did not recognise. Show the tail rather
+    // than claiming success.
+    return `内核拒绝了生成的配置：${result.raw.trim().split('\n').slice(-3).join(' ').slice(0, 400)}`;
+  }
+
+  const lines = result.problems.map((problem) => describeCoreProblem(problem, nodes));
+  // Only nodes the core located can be removed; an index of -1 means the
+  // problem is not attributable to one entry, and guessing would delete the
+  // wrong thing.
+  const badIndexes = new Set(
+    result.problems.filter((problem) => problem.index >= 0 && problem.index < nodes.length).map((problem) => problem.index),
+  );
+  if (badIndexes.size === 0) {
+    return `内核拒绝了生成的配置：${lines.join('；')}`;
+  }
+
+  const badNames = new Set([...badIndexes].map((index) => nodes[index]?.name).filter((name) => typeof name === 'string'));
+  // Dropping entries is only self-healing when a subscription can put them
+  // back. A node list the user pasted in has no other source: removing it
+  // would empty the settings page with nothing left to re-import from.
+  if (state.subscriptionUrl === '') {
+    return `${lines.join('；')}。这些节点无法使用，请更新订阅或重新导入后再试`;
+  }
+  state.nodes = state.nodes.filter((node) => !badNames.has(node.name));
+  if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
+  const note = `已自动移除 ${badNames.size} 个无法使用的节点（${[...badNames].slice(0, 5).join('、')}${badNames.size > 5 ? ' 等' : ''}），请重新点击连接`;
+  state.warnings = [note, ...state.warnings].slice(0, 8);
+  runtime.lastError = `${lines.join('；')}。${note}`;
+  await saveState().catch(() => {});
+
+  if (state.nodes.length === 0) {
+    throw new Error(`订阅中没有能用的节点：${lines.join('；')}`);
+  }
+  return `${lines.join('；')}。${note}`;
 }
 
 /**

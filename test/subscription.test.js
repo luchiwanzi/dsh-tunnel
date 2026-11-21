@@ -93,7 +93,10 @@ test('跳过缺少必要字段的节点', () => {
   const result = parseSubscription(yaml);
   assert.equal(result.nodes.length, 1);
   assert.equal(result.nodes[0].name, 'good');
-  assert.ok(result.warnings.some((w) => w.includes('缺少必要字段')));
+  // The sentence names the field that was actually wrong: a node missing only
+  // its port is a different problem from one speaking an unsupported protocol,
+  // and the old shared "缺少必要字段" line could not tell them apart.
+  assert.ok(result.warnings.some((w) => w.includes('已跳过') && w.includes('ss') && w.includes('port')));
 });
 
 test('skip-cert-verify 节点被标记为 insecure', () => {
@@ -173,4 +176,75 @@ test('无法识别的格式抛出异常', () => {
 test('端口范围校验', () => {
   const bad = uriList('socks5://example.com:99999#bad');
   assert.throws(() => parseSubscription(bad), /无法识别内容格式|没有可用节点/);
+});
+
+test('未知节点类型在解析期被剔除并给出可读警告', () => {
+  const yaml = [
+    'proxies:',
+    '  - name: 香港 01',
+    '    type: ss',
+    '    server: 1.2.3.4',
+    '    port: 443',
+    '    cipher: aes-128-gcm',
+    '    password: p',
+    '  - name: 未来协议',
+    '    type: quasimodo',
+    '    server: 5.6.7.8',
+    '    port: 443',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  assert.equal(result.nodes.length, 1);
+  assert.equal(result.nodes[0].name, '香港 01');
+  const warning = result.warnings.join(' ');
+  // The type and the node name both have to appear: the old message said only
+  // that something was skipped, which left the user with no way to find it.
+  assert.ok(warning.includes('quasimodo'), warning);
+  assert.ok(warning.includes('未来协议'), warning);
+});
+
+test('全部节点类型都不支持时，异常信息说明原因', () => {
+  const yaml = ['proxies:', '  - {name: a, type: quasimodo, server: 1.2.3.4, port: 443}'].join('\n');
+  assert.throws(
+    () => parseSubscription(yaml),
+    (error) => error.message.includes('quasimodo'),
+  );
+});
+
+test('支持的协议类型不被误剔除', () => {
+  const types = ['ss', 'vmess', 'vless', 'trojan', 'hysteria2', 'tuic', 'socks5', 'http', 'anytls', 'mieru', 'tailscale'];
+  const yaml = ['proxies:', ...types.map((type, index) => `  - {name: n${index}, type: ${type}, server: 1.2.3.${index + 1}, port: 443}`)].join('\n');
+  const result = parseSubscription(yaml);
+  assert.equal(result.nodes.length, types.length);
+});
+
+test('tailscale 节点不被当作未知协议剔除', () => {
+  // The pinned core accepts `tailscale` (measured on v1.19.33), and real
+  // tailscale entries carry no server/port at all. Both halves matter: a
+  // whitelist that omits the type drops a working node, and one that keeps it
+  // but still demands server/port drops it one step later.
+  const yaml = [
+    'proxies:',
+    '  - {name: "TS 出口", type: tailscale, "private-key": "tskey-auth-abc"}',
+    '  - {name: ok1, type: ss, server: 1.2.3.4, port: 443, cipher: aes-128-gcm, password: p}',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  assert.equal(result.nodes.length, 2);
+  assert.equal(result.nodes[0].name, 'TS 出口');
+  assert.equal(result.nodes[0].type, 'tailscale');
+  assert.ok(!result.warnings.join(' ').includes('tailscale'), result.warnings.join(' '));
+});
+
+test('警告中的节点名不携带控制字符', () => {
+  // The name comes straight from the provider's YAML. It reaches the settings
+  // page and the log, so an embedded ESC/BEL must not survive: React escapes
+  // the markup, but the terminal does not.
+  const yaml = [
+    'proxies:',
+    '  - {name: "bad\\u001b[31mNode\\u0007", type: quasimodo, server: 1.2.3.4, port: 443}',
+    '  - {name: ok, type: ss, server: 1.2.3.4, port: 443, cipher: aes-128-gcm, password: p}',
+  ].join('\n');
+  const result = parseSubscription(yaml);
+  const warning = result.warnings.join(' ');
+  assert.ok(result.nodes.length === 1);
+  assert.ok(!/\p{Cc}/u.test(warning), JSON.stringify(warning));
 });
