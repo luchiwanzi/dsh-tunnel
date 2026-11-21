@@ -8,7 +8,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
@@ -25,6 +25,7 @@ import {
   CORE_VERSION,
   coreFetch,
   DATA_DIR,
+  LEGACY_DATA_DIR,
   ensureCore,
   ensureGeodata,
   geodataStatus,
@@ -227,7 +228,8 @@ export function apply(ctx, config = {}) {
             return { ok: true, message: statusMessage() };
           }
           if (action === 'disconnect') {
-            await enqueue(disconnectInternal);
+            // 取消必须插队：连接最长占队列 6 分钟，排队等它跑完就失去了「立即断开」的意义。
+            await disconnectInternal();
             return { ok: true, message: statusMessage() };
           }
           if (action === 'select') {
@@ -251,7 +253,29 @@ export function apply(ctx, config = {}) {
   );
 }
 
+/**
+ * 一次性把 1.1.4 及更早留在包目录里的 state.json 复制到用户数据目录。
+ *
+ * 复制而非移动：迁移中途断电或出错时，旧文件还在，用户最多是"订阅没被
+ * 认出来"，不会"两头都缺一块"。复制失败不阻断 —— 插件照常启动，只是
+ * 订阅为空，用户可以重填。
+ */
+export async function migrateLegacyData() {
+  try {
+    const marker = path.join(DATA_DIR, '.migrated');
+    if (existsSync(marker)) return;
+    const legacyState = path.join(LEGACY_DATA_DIR, 'state.json');
+    if (!existsSync(legacyState)) return;
+    await mkdir(DATA_DIR, { recursive: true });
+    await copyFile(legacyState, path.join(DATA_DIR, 'state.json'));
+    await writeFile(marker, new Date().toISOString());
+  } catch {
+    // 迁移是尽力而为：失败时旧数据仍留在原处，用户可手工处理。
+  }
+}
+
 async function loadState() {
+  await migrateLegacyData();
   await mkdir(DATA_DIR, { recursive: true, mode: 0o700 });
   await chmod(DATA_DIR, 0o700).catch(() => {});
   let raw;
@@ -537,7 +561,8 @@ async function dispatch(action, message) {
     return { state: publicState() };
   }
   if (action === 'disconnect') {
-    await enqueue(disconnectInternal);
+    // 取消必须插队：连接最长占队列 6 分钟，排队等它跑完就失去了「立即断开」的意义。
+    await disconnectInternal();
     return { state: publicState() };
   }
   if (action === 'select') {
@@ -585,6 +610,12 @@ function enqueue(task) {
   const run = taskQueue.then(task, task);
   taskQueue = run.catch(() => {});
   return run;
+}
+
+/** 连接流程每一步后调用：用户断开时立刻停手，不再拉起内核。 */
+function throwIfCancelled() {
+  if (runtime.disposed) throw new Error('插件已卸载');
+  if (runtime.connectAbort?.signal.aborted === true) throw new Error('连接已取消');
 }
 
 /**
@@ -792,7 +823,7 @@ async function connectInternal() {
     if (state.nodes.length === 0) throw new Error('订阅中没有可用节点');
 
     const corePath = await ensureCore(configuredCorePath, () => setPhase('downloading'));
-    if (runtime.disposed) throw new Error('插件已卸载');
+    throwIfCancelled();
 
     // The China-direct rules reference GeoSite.dat and GeoIP.dat. A rule whose
     // database is missing stops the core from starting at all, so the databases
@@ -805,7 +836,7 @@ async function connectInternal() {
       },
       signal: runtime.connectAbort?.signal,
     });
-    if (runtime.disposed) throw new Error('插件已卸载');
+    throwIfCancelled();
     const cnDirect = missingGeodata.length === 0;
     if (!cnDirect) {
       // Say it in three places, because each reaches a different reader: the
@@ -833,7 +864,7 @@ async function connectInternal() {
     const secret = randomBytes(24).toString('hex');
     const nodesInUse = activeNodes();
     const { hosts, pinned } = await resolveProxyServers(nodesInUse, state.hosts);
-    if (runtime.disposed) throw new Error('插件已卸载');
+    throwIfCancelled();
     const { text, group } = buildConfig(nodesInUse, {
       mixedPort,
       apiPort,
@@ -851,6 +882,7 @@ async function connectInternal() {
       const logger = hostContext?.logger;
       if (logger && typeof logger.info === 'function') logger.info('tunnel: ' + pinNote);
     }
+    throwIfCancelled();
 
     // Check the file with the core's own parser before starting it for real.
     // This is where a bad node is caught while the node list is still in hand:
@@ -858,11 +890,11 @@ async function connectInternal() {
     // reaches the settings page the connection has already failed and the user
     // has no way to tell which of two hundred nodes is the one to delete.
     const diagnosis = await diagnoseConfig(corePath, nodesInUse);
-    if (runtime.disposed) throw new Error('插件已卸载');
+    throwIfCancelled();
     // The check is interruptible now, so a Disconnect during it has to stop the
     // connect here. Without this the flow would carry on and start a core the
     // user has just asked to shut down.
-    if (runtime.connectAbort?.signal.aborted === true) throw new Error('连接已取消');
+    throwIfCancelled();
     if (diagnosis !== null) throw new Error(diagnosis);
 
     const abort = new AbortController();
@@ -909,15 +941,16 @@ async function connectInternal() {
       });
 
     const version = await waitForCore(apiPort, secret, exitState);
-    if (runtime.disposed) throw new Error('插件已卸载');
+    throwIfCancelled();
     runtime.coreVersion = typeof version.version === 'string' ? version.version : CORE_VERSION;
     const groupInfo = await waitForGroup(apiPort, secret, group, exitState);
+    throwIfCancelled();
     if (groupInfo === null || typeof groupInfo !== 'object') throw new Error('mihomo 没有创建代理组');
     if (state.selected !== '') {
       await selectOnCore(group, state.selected);
     }
     await installProxy(mixedPort);
-    if (runtime.disposed) throw new Error('插件已卸载');
+    throwIfCancelled();
     runtime.connected = true;
     runtime.exitIp = null;
     setPhase('connected');

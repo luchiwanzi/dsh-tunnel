@@ -157,19 +157,21 @@ $env:DSH_TUNNEL_GEODATA_DIR = "D:\my-geodata"   # 启动 DSH 前设置
 
 ## 数据与安全
 
-运行数据保存在插件目录下的 `.data/` 中：
+运行数据保存在用户目录下的 `~/.dsh/tunnel/` 中（可通过 `DSH_TUNNEL_DATA_DIR` 环境变量覆盖到自定义位置）：
 
 | 相对路径 | 用途 |
 |---|---|
-| `.data/state.json` | 订阅地址、解析后的节点、所选节点及配额信息，权限为 `0600`。 |
-| `.data/config.yaml` | 连接时生成的 mihomo 配置，权限为 `0600`。 |
-| `.data/GeoSite.dat` | 国内域名路由数据库，权限为 `0600`。首次连接自动下载并校验 SHA256；设置了 `DSH_TUNNEL_GEODATA_DIR` 时改从该目录读取。 |
-| `.data/GeoIP.dat` | IP 归属数据库，权限为 `0600`。同上。 |
-| `.data/mihomo` | 打包内核不可用时下载的备用内核。 |
+| `~/.dsh/tunnel/state.json` | 订阅地址、解析后的节点、所选节点及配额信息。 |
+| `~/.dsh/tunnel/config.yaml` | 连接时生成的 mihomo 配置。 |
+| `~/.dsh/tunnel/GeoSite.dat` | 国内域名路由数据库。首次连接自动下载并校验 SHA256；设置了 `DSH_TUNNEL_GEODATA_DIR` 时改从该目录读取。 |
+| `~/.dsh/tunnel/GeoIP.dat` | IP 归属数据库。同上。 |
+| `~/.dsh/tunnel/mihomo` | 打包内核不可用时下载的备用内核。 |
 
-数据目录权限为 `0700`，仅允许所有者访问。移除订阅会删除保存的订阅状态。
+Linux/macOS 下 `state.json`、`config.yaml` 权限为 `0600`、数据目录为 `0700`；Windows 无 Unix 权限位，安全性依赖用户目录 ACL（默认仅本人可读写）。移除订阅会删除保存的订阅状态。
 
-**这些数据可能包含订阅令牌和节点密码，请勿公开或提交到 Git。** 仓库已通过 `.gitignore` 排除 `.data/`、依赖目录和环境变量文件。卸载后若仍有残留数据，可在确认不再需要后手动删除；不要依赖卸载保留数据。
+升级自 1.1.4 及更早版本时，旧的 `.data/state.json` 会在首次启动时自动复制到新目录（保留原件，可手动删除）。
+
+**这些数据可能包含订阅令牌和节点密码，请勿公开或提交到 Git。** 仓库已通过 `.gitignore` 排除依赖目录和环境变量文件。卸载后若仍有残留数据，可在确认不再需要后手动删除；不要依赖卸载保留数据。
 
 ### 安全加固
 

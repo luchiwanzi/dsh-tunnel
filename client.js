@@ -30,6 +30,7 @@ window.__ModuleLoader__.load({
       disconnect: 'Disconnect',
       connecting: 'Connecting…',
       stopping: 'Stopping…',
+      cancel: 'Cancel',
       subscriptionTitle: 'Subscription',
       subscriptionHint: 'Paste a Clash / mihomo subscription URL, or a base64 node list. Nodes are parsed locally.',
       subscriptionPlaceholder: 'https://example.com/api/v1/client/subscribe?token=…',
@@ -79,7 +80,7 @@ window.__ModuleLoader__.load({
       latencyDone: 'Latency test finished.',
       scopeTitle: 'Scope',
       scopeBody: 'Only the current Harness process: model requests, web_search / web_fetch, MCP, and subprocesses started afterwards. No system proxy, no TUN, no OS network changes.',
-      securityNote: 'Subscription and node credentials are stored in this plugin’s local data directory with owner-only permissions.',
+      securityNote: 'Subscription and node credentials are stored in your user data directory (~/.dsh/tunnel).',
       firstRunNote: 'First connection downloads a pinned mihomo core (about 22 MB) from GitHub. Later connections reuse it.',
       noCore: 'Core not downloaded yet.',
       errorTitle: 'Operation failed',
@@ -135,6 +136,7 @@ window.__ModuleLoader__.load({
       disconnect: '断开',
       connecting: '正在连接…',
       stopping: '正在断开…',
+      cancel: '取消',
       subscriptionTitle: '订阅',
       subscriptionHint: '粘贴 Clash / mihomo 订阅链接，或 Base64 节点列表。节点在本地解析。',
       subscriptionPlaceholder: 'https://example.com/api/v1/client/subscribe?token=…',
@@ -184,7 +186,7 @@ window.__ModuleLoader__.load({
       latencyDone: '测速完成。',
       scopeTitle: '作用范围',
       scopeBody: '仅影响当前 Harness 进程：模型请求、web_search / web_fetch、MCP，以及之后启动的子进程。不设置系统代理，不创建 TUN，不修改操作系统网络。',
-      securityNote: '订阅和节点凭据保存在本插件的数据目录，仅当前用户可读写。',
+      securityNote: '订阅和节点凭据保存在用户数据目录（~/.dsh/tunnel）。',
       firstRunNote: '首次连接会从 GitHub 下载固定版本的 mihomo 内核（约 22 MB），后续连接直接复用。',
       noCore: '尚未下载内核。',
       errorTitle: '操作失败',
@@ -706,11 +708,11 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'dshtunnel-hero-actions' },
-            connected
+            (connected || busy === 'connect')
               ? h(
                   'button',
-                  { type: 'button', className: 'dshtunnel-btn danger', disabled: working, onClick: disconnect },
-                  busy === 'disconnect' ? t('stopping') : t('disconnect'),
+                  { type: 'button', className: 'dshtunnel-btn danger', disabled: false, onClick: disconnect },
+                  busy === 'connect' ? t('cancel') : (busy === 'disconnect' ? t('stopping') : t('disconnect')),
                 )
               : h(
                   'button',
