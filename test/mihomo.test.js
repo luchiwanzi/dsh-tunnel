@@ -37,12 +37,18 @@ test('verifyCoreBinary：linux 现在也在校验范围内', async () => {
   }
 });
 
-test('verifyCoreBinary：读失败 fail-closed（不静默放行）', () => {
-  // 传一个目录冒充文件：existsSync 为真但 readFileSync 抛 EISDIR。
-  // 安全校验不能因此放行，必须返回错误。
-  const result = verifyCoreBinary('C:/deepseek插件/_audit-final/fixwork/lib', 'win32', 'x64');
-  assert.notEqual(result, null);
-  assert.match(result, /读取失败/);
+test('verifyCoreBinary：读失败 fail-closed（不静默放行）', async () => {
+  // 用 mkdtemp 现造一个目录冒充内核文件：existsSync 为真但 readFileSync 抛
+  // EISDIR。这样在任何机器（含 CI）上都真的走 EISDIR 分支 —— 之前用硬编码的
+  // 绝对路径，在 CI 上只会因为「路径不存在」而恰好通过，从没测到目标分支。
+  const dir = await mkdtemp(path.join(tmpdir(), 'mihomo-eisdir-'));
+  try {
+    const result = verifyCoreBinary(dir, 'win32', 'x64');
+    assert.notEqual(result, null);
+    assert.match(result, /读取失败/);
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 test('verifyCoreBinary：有 pin 平台且字节不匹配时返回带平台/路径/双 hash 的错误', async () => {
