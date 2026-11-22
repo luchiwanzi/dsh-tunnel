@@ -9,7 +9,7 @@ import { writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { verifyCoreBinary, coreSource, expectedSha256, CORE_VERSION } from '../lib/mihomo.js';
+import { verifyCoreBinary, coreSource, expectedSha256, digestMatches, CORE_VERSION } from '../lib/mihomo.js';
 
 test('版本号仍是钉住的 v1.19.33', () => {
   assert.equal(CORE_VERSION, 'v1.19.33');
@@ -137,21 +137,29 @@ test('expectedSha256：两张表都没有的平台返回 null（不校验）', (
   assert.equal(expectedSha256('freebsd', 'x64', 'npm'), null);
 });
 
-test('verifyCoreBinary：有 pin 且字节正确时返回 null（成功路径）', async () => {
-  // 构造一个 hash 恰好等于某平台 pin 的文件不现实（pin 是 60MB 真实内核）。
-  // 改为：若本机存在真实内核，则用它的真实 pin 验证成功路径；
-  // 不存在则跳过（CI 上没有该文件），保证测试可移植。
-  const candidates = [
-    'C:/deepseek插件/_audit114/t2/mihomo.exe',
+test('digestMatches：成功路径的判定逻辑', () => {
+  // 成功路径用纯函数验证 —— 真实内核是 60MB 二进制，测试里既造不出 hash
+  // 恰好等于 pin 的文件，也不该依赖任何本机路径。
+  const pin = expectedSha256('win32', 'x64', 'npm').digest;
+  assert.equal(digestMatches(pin, pin), true, '实际值与 pin 一致应通过');
+  assert.equal(digestMatches('deadbeef', pin), false, '不一致应拒绝');
+  assert.equal(digestMatches(undefined, pin), false);
+  assert.equal(digestMatches(null, pin), false);
+});
+
+test('expectedSha256 的 pin 都是 64 位小写 hex', () => {
+  // 防止手抄 pin 时漏字符或混入大写，那会让校验永远失败。
+  const platforms = [
+    ['win32', 'x64'], ['win32', 'arm64'],
+    ['darwin', 'x64'], ['darwin', 'arm64'],
+    ['android', 'arm64'],
+    ['linux', 'x64'], ['linux', 'arm64'],
   ];
-  const { existsSync } = await import('node:fs');
-  const real = candidates.find((p) => existsSync(p));
-  if (real === undefined) {
-    // 没有真实内核样本时，这条无法验证，明确 skip 而不是假装通过。
-    assert.ok(true, '本机无真实内核样本，跳过成功路径验证');
-    return;
+  for (const [p, a] of platforms) {
+    for (const src of ['npm', 'downloaded']) {
+      const entry = expectedSha256(p, a, src);
+      if (entry === null) continue;
+      assert.match(entry.digest, /^[0-9a-f]{64}$/, `${p}-${a}/${src} 的 pin 格式不对`);
+    }
   }
-  assert.equal(verifyCoreBinary(real, 'win32', 'x64', 'npm'), null);
-  // 同一份文件按下载缓存表校验也应通过（win32 的 downloaded 回落到 npm 表）
-  assert.equal(verifyCoreBinary(real, 'win32', 'x64', 'downloaded'), null);
 });
