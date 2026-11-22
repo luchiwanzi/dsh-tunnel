@@ -97,6 +97,14 @@ const runtime = {
    * 用户点了取消却照样把内核拉起来。这个标记只由连接流程自己复位。
    */
   cancelRequested: false,
+  /**
+   * 内核二进制是否已通过 SHA256 pin 校验。
+   *
+   * `coreAvailable` 只能说明文件存在 —— 被篡改的内核同样"存在"，设置页会
+   * 显示成"内核已就绪"，用户点连接才被拒绝。这个字段记录真正的校验结果，
+   * 让界面状态与实际可用性一致。null 表示尚未校验（还没连过）。
+   */
+  coreVerified: null,
   exitState: null,
   proxyDispose: null,
   generation: 0,
@@ -116,7 +124,15 @@ export const inject = ['webServer', 'connection', 'subprocess', 'tools'];
 
 export function apply(ctx, config = {}) {
   hostContext = ctx;
-  configuredCorePath = typeof config?.corePath === 'string' ? config.corePath : '';
+  // 内核路径：插件配置优先，其次 DSH_TUNNEL_CORE_PATH 环境变量。
+  // README 与校验失败提示里都把环境变量写成兜底出路，这里必须真的读取它，
+  // 否则用户照做无效 —— 之前它只出现在文案里，从未被 process.env 读过。
+  const envCorePath = typeof process.env.DSH_TUNNEL_CORE_PATH === 'string'
+    ? process.env.DSH_TUNNEL_CORE_PATH.trim()
+    : '';
+  configuredCorePath = typeof config?.corePath === 'string' && config.corePath.trim() !== ''
+    ? config.corePath
+    : envCorePath;
   configuredDirectHosts = Array.isArray(config?.directHosts)
     ? config.directHosts.filter((item) => typeof item === 'string' && item.trim() !== '')
     : [];
@@ -136,6 +152,7 @@ export function apply(ctx, config = {}) {
   runtime.coreAbort = null;
   runtime.connectAbort = null;
   runtime.cancelRequested = false;
+  runtime.coreVerified = null;
   runtime.exitState = null;
   runtime.proxyDispose = null;
   runtime.generation = 0;
@@ -484,6 +501,13 @@ function publicState() {
     lastError: runtime.lastError,
     group: runtime.group,
     coreAvailable: existsSync(resolveCorePath(configuredCorePath)),
+    // coreAvailable 只代表文件存在；coreVerified 才代表它通过了 pin 校验。
+    // null = 还没连过、未校验，或用的是自定义内核（按设计跳过校验）；
+    // true = 通过 pin 校验；false = 校验失败被拒。
+    coreVerified: runtime.coreVerified,
+    // 是否在使用自定义内核。自定义内核跳过 pin 校验，前端要据此说明
+    // 「未校验」而不是显示成「内核已就绪」，否则两种完全不同的可信度会被混为一谈。
+    coreCustom: typeof configuredCorePath === 'string' && configuredCorePath.trim() !== '',
     // Whether the split-rule databases are on disk. The first connect has to
     // fetch them, which takes tens of seconds; the UI says so instead of
     // showing an unexplained wait on `preparing`.
@@ -883,7 +907,13 @@ async function connectInternal() {
       throw new Error(`当前 ${countHiddenNodes()} 个节点都关闭了证书校验，已被安全策略隐藏；如需使用请开启「允许不安全节点」`);
     }
 
+    // 自定义内核（配置项 corePath / DSH_TUNNEL_CORE_PATH）按设计跳过 pin 校验，
+    // ensureCore 对它提前 return。这种内核不能记成「已通过校验」—— 那会把
+    // 「由你自己对这份二进制负责」谎报成「插件校验过了」。留 null 表示未校验，
+    // 前端据此区分「校验通过」与「自定义内核、未校验」两种状态。
+    const customCore = typeof configuredCorePath === 'string' && configuredCorePath.trim() !== '';
     const corePath = await ensureCore(configuredCorePath, () => setPhase('downloading'));
+    runtime.coreVerified = customCore ? null : true;
     throwIfCancelled();
 
     // The China-direct rules reference GeoSite.dat and GeoIP.dat. A rule whose
@@ -1028,6 +1058,11 @@ async function connectInternal() {
     // 注意顺序：必须在 teardownRuntime() 之前读 cancelled —— teardown 会把
     // cancelRequested 再次置 true，先读才能拿到"这次连接是否被用户取消"。
     const cancelled = runtime.cancelRequested === true;
+    // 内核校验失败要让界面知道：coreAvailable 仍是 true（文件确实存在），
+    // 但 coreVerified 置 false，避免设置页显示"内核已就绪"却连不上。
+    if (/内核完整性校验失败|内核完整性校验无法完成/.test(message)) {
+      runtime.coreVerified = false;
+    }
     await teardownRuntime();
     runtime.lastError = cancelled ? null : message;
     setPhase(cancelled ? 'idle' : 'error');
