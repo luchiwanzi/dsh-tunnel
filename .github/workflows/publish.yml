@@ -9,6 +9,8 @@ jobs:
     name: Publish to npm if version changed
     runs-on: ubuntu-latest
     if: github.repository_owner == 'luchiwanzi'
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -94,3 +96,47 @@ jobs:
           echo "发布确认生效"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # 只有 npm 发布成功后才建 tag + Release，避免「Release 有了但 npm 上没有」。
+      # 用 GITHUB_TOKEN 创建的 tag 不会触发新的 workflow 运行，因此不会形成循环。
+      # 说明正文用 heredoc 写进文件再走 --notes-file：bash 双引号里的 \n 是字面量，
+      # 直接塞进 --notes 会让 Markdown 变成一行，代码块也无法渲染。
+      - name: 创建 GitHub Release
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          TAG="v$VERSION"
+          NAME="${{ steps.check.outputs.name }}"
+          REPO="${{ github.repository }}"
+          echo "准备为 $NAME@$VERSION 创建 Release（tag: $TAG）"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG 已存在，跳过创建"
+            exit 0
+          fi
+
+          cat > release-notes.md <<RELEASE_NOTES
+          ## 安装
+
+          \`\`\`bash
+          dsh plugin --profile <profile> add $NAME
+          \`\`\`
+
+          或在 DSH 的 **设置 → 插件市场** 中搜索 \`$NAME\`。
+
+          ## 说明
+
+          - 代理作用于 DSH 进程本身，不改系统代理、不动路由表。
+          - 支持 Clash / mihomo 订阅与粘贴 YAML，本地解析。
+          - 内核启动前做 SHA256 字节级校验。
+
+          完整文档见 [README](https://github.com/$REPO#readme)。
+          RELEASE_NOTES
+
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --target "$GITHUB_SHA" \
+            --notes-file release-notes.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
