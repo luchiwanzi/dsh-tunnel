@@ -502,8 +502,12 @@ function publicState() {
     group: runtime.group,
     coreAvailable: existsSync(resolveCorePath(configuredCorePath)),
     // coreAvailable 只代表文件存在；coreVerified 才代表它通过了 pin 校验。
-    // null = 还没连过、未校验；true = 校验通过；false = 校验失败被拒。
+    // null = 还没连过、未校验，或用的是自定义内核（按设计跳过校验）；
+    // true = 通过 pin 校验；false = 校验失败被拒。
     coreVerified: runtime.coreVerified,
+    // 是否在使用自定义内核。自定义内核跳过 pin 校验，前端要据此说明
+    // 「未校验」而不是显示成「内核已就绪」，否则两种完全不同的可信度会被混为一谈。
+    coreCustom: typeof configuredCorePath === 'string' && configuredCorePath.trim() !== '',
     // Whether the split-rule databases are on disk. The first connect has to
     // fetch them, which takes tens of seconds; the UI says so instead of
     // showing an unexplained wait on `preparing`.
@@ -903,9 +907,13 @@ async function connectInternal() {
       throw new Error(`当前 ${countHiddenNodes()} 个节点都关闭了证书校验，已被安全策略隐藏；如需使用请开启「允许不安全节点」`);
     }
 
+    // 自定义内核（配置项 corePath / DSH_TUNNEL_CORE_PATH）按设计跳过 pin 校验，
+    // ensureCore 对它提前 return。这种内核不能记成「已通过校验」—— 那会把
+    // 「由你自己对这份二进制负责」谎报成「插件校验过了」。留 null 表示未校验，
+    // 前端据此区分「校验通过」与「自定义内核、未校验」两种状态。
+    const customCore = typeof configuredCorePath === 'string' && configuredCorePath.trim() !== '';
     const corePath = await ensureCore(configuredCorePath, () => setPhase('downloading'));
-    // ensureCore 正常返回即代表内核已通过（或按设计跳过）pin 校验。
-    runtime.coreVerified = true;
+    runtime.coreVerified = customCore ? null : true;
     throwIfCancelled();
 
     // The China-direct rules reference GeoSite.dat and GeoIP.dat. A rule whose
