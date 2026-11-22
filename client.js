@@ -83,6 +83,9 @@ window.__ModuleLoader__.load({
       securityNote: 'Subscription and node credentials are stored in your user data directory (~/.dsh/tunnel).',
       firstRunNote: 'First connection downloads a pinned mihomo core (about 22 MB) from GitHub. Later connections reuse it.',
       noCore: 'Core not downloaded yet.',
+      coreVerifyFailed: 'The mihomo core failed its integrity check. Delete it and reconnect to re-download.',
+      coreUnverified: 'Using a custom core from corePath / DSH_TUNNEL_CORE_PATH. Its bytes are not verified by the plugin — you are responsible for that binary.',
+      coreVerifiedNote: 'Core integrity verified (SHA256 pin).',
       errorTitle: 'Operation failed',
       noticeTitle: 'Done',
       dismiss: 'Dismiss',
@@ -208,6 +211,9 @@ window.__ModuleLoader__.load({
       allowInsecureHint: '默认拒绝 skip-cert-verify（关闭证书校验）节点，存在中间人风险。仅在信任该订阅并接受风险时开启。',
       allowInsecureOn: '已允许不安全节点。',
       allowInsecureOff: '已隐藏不安全节点，重新开启即可恢复。',
+      coreVerifyFailed: '内核完整性校验失败。删除该内核文件后重新连接即可重新下载。',
+      coreUnverified: '正在使用 corePath / DSH_TUNNEL_CORE_PATH 指定的自定义内核，插件未校验其字节，这份二进制由你负责。',
+      coreVerifiedNote: '内核完整性已通过 SHA256 校验。',
       nodeHidden: '已隐藏：该节点关闭了证书校验。开启「允许不安全节点」后可用。',
       directListTitle: '直连名单',
       directListHint: '国内流量已默认直连。这里补充需要直连的站点：可填域名、域名后缀、IP 或网段。',
@@ -859,6 +865,28 @@ window.__ModuleLoader__.load({
           !snapshot.coreAvailable
             ? h('div', { className: 'dshtunnel-meta' }, h('span', null, t('firstRunNote')))
             : null,
+          // coreAvailable 只说明文件在。校验失败 / 自定义内核未校验这两种情况
+          // 必须显式说明，否则「文件存在」会被读成「内核可用」，而真正的原因
+          // （校验没过）要等用户点连接才以一条报错出现。
+          snapshot.coreVerified === false
+            ? h(
+                'div',
+                { className: 'dshtunnel-warn', key: 'core-verify-failed' },
+                h('span', null, t('coreVerifyFailed')),
+              )
+            : snapshot.coreVerified === null && snapshot.coreCustom === true
+              ? h(
+                  'div',
+                  { className: 'dshtunnel-meta', key: 'core-unverified' },
+                  h('span', null, t('coreUnverified')),
+                )
+              : snapshot.coreVerified === true
+                ? h(
+                    'div',
+                    { className: 'dshtunnel-meta', key: 'core-verified' },
+                    h('span', null, t('coreVerifiedNote')),
+                  )
+                : null,
         ),
 
         h(

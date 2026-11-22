@@ -137,14 +137,55 @@ test('expectedSha256：两张表都没有的平台返回 null（不校验）', (
   assert.equal(expectedSha256('freebsd', 'x64', 'npm'), null);
 });
 
-test('digestMatches：成功路径的判定逻辑', () => {
-  // 成功路径用纯函数验证 —— 真实内核是 60MB 二进制，测试里既造不出 hash
-  // 恰好等于 pin 的文件，也不该依赖任何本机路径。
+test('verifyCoreBinary：字节与 pin 一致时返回 null（真正的成功路径）', async () => {
+  // 之前这里用 digestMatches(pin, pin) 断言，等价于 a === a，是同义反复：
+  // 它既没走 verifyCoreBinary，也没证明「校验通过时函数返回 null」。
+  // 真实内核是 60MB 二进制，不能依赖本机路径 —— 但可以让测试自己造一份
+  // 内容、算出它的 sha256、再把这份 digest 当作注入的 pin 传进去。
+  // 为此 verifyCoreBinary 增加可选的 expected 参数（默认仍查表）。
+  const dir = await mkdtemp(path.join(tmpdir(), 'mihomo-ok-'));
+  const fake = path.join(dir, 'core-ok');
+  try {
+    const content = Buffer.from('a real successful verification path');
+    await writeFile(fake, content);
+    const realSha = createHash('sha256').update(content).digest('hex');
+    // 注入 pin：函数应判定通过并返回 null
+    const pass = verifyCoreBinary(fake, 'win32', 'x64', 'npm', { digest: realSha, table: 'TEST_PIN' });
+    assert.equal(pass, null, '字节与 pin 一致时必须返回 null');
+    // 同一份文件、换一个不同的 pin：必须判失败，证明成功不是无条件返回
+    const wrongPin = realSha.replace(/^./, realSha[0] === '0' ? '1' : '0');
+    const fail = verifyCoreBinary(fake, 'win32', 'x64', 'npm', { digest: wrongPin, table: 'TEST_PIN' });
+    assert.notEqual(fail, null, 'pin 不一致时必须拒绝');
+    assert.match(fail, /SHA256 不匹配/);
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test('digestMatches：边界值判定', () => {
   const pin = expectedSha256('win32', 'x64', 'npm').digest;
-  assert.equal(digestMatches(pin, pin), true, '实际值与 pin 一致应通过');
-  assert.equal(digestMatches('deadbeef', pin), false, '不一致应拒绝');
+  assert.equal(digestMatches(pin, pin), true);
+  assert.equal(digestMatches('deadbeef', pin), false);
   assert.equal(digestMatches(undefined, pin), false);
   assert.equal(digestMatches(null, pin), false);
+  // 非字符串一律拒绝：防止意外传入 Buffer/数字时被宽松比较放过。
+  assert.equal(digestMatches(123, pin), false);
+  assert.equal(digestMatches(Buffer.from(pin), pin), false);
+});
+
+test('两张表必须自洽：linux 下载路径的裸二进制 pin 必须存在', () => {
+  // 下载分支落盘前会用 DOWNLOADED_CORE_SHA256 校验解压后的二进制。若某天
+  // 只更新 CORE_SHA256（压缩包）而漏更新 DOWNLOADED_CORE_SHA256（裸二进制），
+  // 就会出现「下载成功 -> 下次连接校验失败 -> 提示删除重下 -> 又失败」的死循环。
+  // 这条测试把「Linux 能下载的每个平台都必须有裸二进制 pin」钉住，
+  // 让漏更新在 CI 阶段就暴露，而不是在用户机器上循环。
+  for (const arch of ['x64', 'arm64']) {
+    const packed = expectedSha256('linux', arch, 'downloaded');
+    assert.notEqual(packed, null, `linux-${arch} 缺 DOWNLOADED_CORE_SHA256，下载后会陷入校验死循环`);
+    assert.equal(packed.table, 'DOWNLOADED_CORE_SHA256');
+  }
+  // 下载分支只对 Linux 生效（coreAssetName 在非 Linux 返回 null），
+  // 所以只需要保证 Linux 两条 pin 齐全即可。
 });
 
 test('expectedSha256 的 pin 都是 64 位小写 hex', () => {
