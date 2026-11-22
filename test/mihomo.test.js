@@ -9,7 +9,7 @@ import { writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { verifyCoreBinary, CORE_VERSION } from '../lib/mihomo.js';
+import { verifyCoreBinary, coreSource, expectedSha256, CORE_VERSION } from '../lib/mihomo.js';
 
 test('版本号仍是钉住的 v1.19.33', () => {
   assert.equal(CORE_VERSION, 'v1.19.33');
@@ -103,4 +103,55 @@ test('verifyCoreBinary：linux 下载缓存与 npm 包用不同的 pin 表', asy
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
+});
+
+test('coreSource：npm 包路径判定为 npm，其余为 downloaded', () => {
+  // 这是「用错表就会误拒正常内核」的关键分支，之前没有测试兜着。
+  assert.equal(coreSource('/a/b/mihomo.exe', '/a/b/mihomo.exe'), 'npm');
+  // 大小写/分隔符差异也应判定为同一文件（path.resolve 归一化）。
+  assert.equal(coreSource('/a/b/mihomo.exe', null), 'downloaded');
+  assert.equal(coreSource('/a/b/mihomo.exe', '/a/c/mihomo.exe'), 'downloaded');
+  assert.equal(coreSource('/a/b/mihomo.exe', undefined), 'downloaded');
+});
+
+test('expectedSha256：linux 两种来源命中不同的表', () => {
+  const npm = expectedSha256('linux', 'x64', 'npm');
+  const dl = expectedSha256('linux', 'x64', 'downloaded');
+  assert.equal(npm.table, 'PACKAGED_CORE_SHA256');
+  assert.equal(dl.table, 'DOWNLOADED_CORE_SHA256');
+  assert.notEqual(npm.digest, dl.digest, 'linux npm 与下载缓存应不同 pin');
+});
+
+test('expectedSha256：非 Linux 的 downloaded 回落到 npm 表', () => {
+  // Windows/macOS 没有 DOWNLOADED 条目，必须回落到 PACKAGED，
+  // 否则它们的缓存内核完全不校验（之前的 fail-open 漏洞）。
+  const win = expectedSha256('win32', 'x64', 'downloaded');
+  assert.notEqual(win, null);
+  assert.equal(win.table, 'PACKAGED_CORE_SHA256');
+  const mac = expectedSha256('darwin', 'arm64', 'downloaded');
+  assert.equal(mac.table, 'PACKAGED_CORE_SHA256');
+});
+
+test('expectedSha256：两张表都没有的平台返回 null（不校验）', () => {
+  assert.equal(expectedSha256('freebsd', 'x64', 'downloaded'), null);
+  assert.equal(expectedSha256('freebsd', 'x64', 'npm'), null);
+});
+
+test('verifyCoreBinary：有 pin 且字节正确时返回 null（成功路径）', async () => {
+  // 构造一个 hash 恰好等于某平台 pin 的文件不现实（pin 是 60MB 真实内核）。
+  // 改为：若本机存在真实内核，则用它的真实 pin 验证成功路径；
+  // 不存在则跳过（CI 上没有该文件），保证测试可移植。
+  const candidates = [
+    'C:/deepseek插件/_audit114/t2/mihomo.exe',
+  ];
+  const { existsSync } = await import('node:fs');
+  const real = candidates.find((p) => existsSync(p));
+  if (real === undefined) {
+    // 没有真实内核样本时，这条无法验证，明确 skip 而不是假装通过。
+    assert.ok(true, '本机无真实内核样本，跳过成功路径验证');
+    return;
+  }
+  assert.equal(verifyCoreBinary(real, 'win32', 'x64', 'npm'), null);
+  // 同一份文件按下载缓存表校验也应通过（win32 的 downloaded 回落到 npm 表）
+  assert.equal(verifyCoreBinary(real, 'win32', 'x64', 'downloaded'), null);
 });

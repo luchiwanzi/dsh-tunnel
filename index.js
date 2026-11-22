@@ -97,6 +97,14 @@ const runtime = {
    * 用户点了取消却照样把内核拉起来。这个标记只由连接流程自己复位。
    */
   cancelRequested: false,
+  /**
+   * 内核二进制是否已通过 SHA256 pin 校验。
+   *
+   * `coreAvailable` 只能说明文件存在 —— 被篡改的内核同样"存在"，设置页会
+   * 显示成"内核已就绪"，用户点连接才被拒绝。这个字段记录真正的校验结果，
+   * 让界面状态与实际可用性一致。null 表示尚未校验（还没连过）。
+   */
+  coreVerified: null,
   exitState: null,
   proxyDispose: null,
   generation: 0,
@@ -144,6 +152,7 @@ export function apply(ctx, config = {}) {
   runtime.coreAbort = null;
   runtime.connectAbort = null;
   runtime.cancelRequested = false;
+  runtime.coreVerified = null;
   runtime.exitState = null;
   runtime.proxyDispose = null;
   runtime.generation = 0;
@@ -492,6 +501,9 @@ function publicState() {
     lastError: runtime.lastError,
     group: runtime.group,
     coreAvailable: existsSync(resolveCorePath(configuredCorePath)),
+    // coreAvailable 只代表文件存在；coreVerified 才代表它通过了 pin 校验。
+    // null = 还没连过、未校验；true = 校验通过；false = 校验失败被拒。
+    coreVerified: runtime.coreVerified,
     // Whether the split-rule databases are on disk. The first connect has to
     // fetch them, which takes tens of seconds; the UI says so instead of
     // showing an unexplained wait on `preparing`.
@@ -892,6 +904,8 @@ async function connectInternal() {
     }
 
     const corePath = await ensureCore(configuredCorePath, () => setPhase('downloading'));
+    // ensureCore 正常返回即代表内核已通过（或按设计跳过）pin 校验。
+    runtime.coreVerified = true;
     throwIfCancelled();
 
     // The China-direct rules reference GeoSite.dat and GeoIP.dat. A rule whose
@@ -1036,6 +1050,11 @@ async function connectInternal() {
     // 注意顺序：必须在 teardownRuntime() 之前读 cancelled —— teardown 会把
     // cancelRequested 再次置 true，先读才能拿到"这次连接是否被用户取消"。
     const cancelled = runtime.cancelRequested === true;
+    // 内核校验失败要让界面知道：coreAvailable 仍是 true（文件确实存在），
+    // 但 coreVerified 置 false，避免设置页显示"内核已就绪"却连不上。
+    if (/内核完整性校验失败|内核完整性校验无法完成/.test(message)) {
+      runtime.coreVerified = false;
+    }
     await teardownRuntime();
     runtime.lastError = cancelled ? null : message;
     setPhase(cancelled ? 'idle' : 'error');
