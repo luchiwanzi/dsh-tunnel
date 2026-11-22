@@ -3,6 +3,14 @@ name: Publish
 on:
   push:
     branches: [main]
+  # 手动触发：用于补建历史版本的 Release（npm 已发布但 GitHub 侧没有记录时）。
+  # 勾选 force_release 可跳过「版本已发布就跳过」的判断，只补建 tag + Release。
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: 'npm 上已存在该版本时，仍然创建 GitHub Release'
+        type: boolean
+        default: true
 
 jobs:
   publish:
@@ -53,8 +61,18 @@ jobs:
           echo "本地版本: $LOCAL ($NAME)"
           PUBLISHED=$(npm view "$NAME" version 2>/dev/null || echo "")
           echo "npm 上 latest: ${PUBLISHED:-（不存在）}"
+          # 手动触发且勾了 force_release 时，即使 npm 上已有该版本也继续，
+          # 只走后面的「创建 GitHub Release」步骤（npm 发布步骤会因版本已存在而失败，
+          # 所以那种情况下用 release_only 标记，跳过 npm 发布）。
+          FORCE="${{ github.event.inputs.force_release }}"
           if [ "$LOCAL" = "$PUBLISHED" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
+            if [ "$FORCE" = "true" ]; then
+              echo "release_only=true" >> "$GITHUB_OUTPUT"
+              echo "version=$LOCAL" >> "$GITHUB_OUTPUT"
+              echo "name=$NAME" >> "$GITHUB_OUTPUT"
+              echo "版本已在 npm 上，手动模式：只补建 GitHub Release"
+            fi
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
             echo "version=$LOCAL" >> "$GITHUB_OUTPUT"
@@ -63,8 +81,10 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      # release_only=true 表示「npm 上已有该版本，本次只补建 Release」，
+      # 此时跳过 npm 发布与验证，避免重复发布报错。
       - name: 发布到 npm
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.skip == 'false' && steps.check.outputs.release_only != 'true'
         run: |
           echo "开始发布 ${{ steps.check.outputs.name }}@${{ steps.check.outputs.version }}"
           set +e
@@ -81,7 +101,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: 发布后验证
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.skip == 'false' && steps.check.outputs.release_only != 'true'
         run: |
           NAME="${{ steps.check.outputs.name }}"
           WANT="${{ steps.check.outputs.version }}"
@@ -101,8 +121,10 @@ jobs:
       # 用 GITHUB_TOKEN 创建的 tag 不会触发新的 workflow 运行，因此不会形成循环。
       # 说明正文用 heredoc 写进文件再走 --notes-file：bash 双引号里的 \n 是字面量，
       # 直接塞进 --notes 会让 Markdown 变成一行，代码块也无法渲染。
+      # Release 步骤的条件与上面不同：release_only 时也要执行（那正是它的用途），
+      # 只要拿到了 version 就建。
       - name: 创建 GitHub Release
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.version != ''
         run: |
           VERSION="${{ steps.check.outputs.version }}"
           TAG="v$VERSION"
