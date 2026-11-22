@@ -116,7 +116,15 @@ export const inject = ['webServer', 'connection', 'subprocess', 'tools'];
 
 export function apply(ctx, config = {}) {
   hostContext = ctx;
-  configuredCorePath = typeof config?.corePath === 'string' ? config.corePath : '';
+  // 内核路径：插件配置优先，其次 DSH_TUNNEL_CORE_PATH 环境变量。
+  // README 与校验失败提示里都把环境变量写成兜底出路，这里必须真的读取它，
+  // 否则用户照做无效 —— 之前它只出现在文案里，从未被 process.env 读过。
+  const envCorePath = typeof process.env.DSH_TUNNEL_CORE_PATH === 'string'
+    ? process.env.DSH_TUNNEL_CORE_PATH.trim()
+    : '';
+  configuredCorePath = typeof config?.corePath === 'string' && config.corePath.trim() !== ''
+    ? config.corePath
+    : envCorePath;
   configuredDirectHosts = Array.isArray(config?.directHosts)
     ? config.directHosts.filter((item) => typeof item === 'string' && item.trim() !== '')
     : [];
