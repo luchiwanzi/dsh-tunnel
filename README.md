@@ -6,6 +6,8 @@
 
 您的 [**Star ⭐ ↗**](https://github.com/luchiwanzi/dsh-tunnel) 就是我更新的动力，球球了，这对我很重要！如有问题，欢迎去 [**提 Issue ↗**](https://github.com/luchiwanzi/dsh-tunnel/issues/new)，**您来许愿，我来实现！**
 
+**语言 / Language:** 简体中文 · [English](README.en.md)
+
 [Releases](https://github.com/luchiwanzi/dsh-tunnel/releases) · [npm](https://www.npmjs.com/package/@wanziya/dsh-tunnel) · [Issues](https://github.com/luchiwanzi/dsh-tunnel/issues)
 
 模型请求由 **DSH 进程** 发出，不是由浏览器发出。所以「页面能打开」不代表模型接口能连上，「浏览器能访问国外网站」也不代表 DSH 能访问——尤其在国内云服务器上部署时，出站受限是常态。插件把这件事放进 DSH 的设置页：不用改系统代理、不动路由表，也不需要给整台机器套全局代理。
