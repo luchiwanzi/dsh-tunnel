@@ -2,6 +2,12 @@
 
 **为 DeepSeek Harness 提供一条可控的出站网络：让模型请求、联网工具和 MCP 走你选的代理节点，并让国内流量保持直连。**
 
+[![npm](https://img.shields.io/npm/v/@wanziya/dsh-tunnel?label=npm&color=blue)](https://www.npmjs.com/package/@wanziya/dsh-tunnel) [![CI](https://github.com/luchiwanzi/dsh-tunnel/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/luchiwanzi/dsh-tunnel/actions/workflows/ci.yml) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D6) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+您的 [**Star ⭐ ↗**](https://github.com/luchiwanzi/dsh-tunnel) 就是我更新的动力，球球了，这对我很重要！如有问题，欢迎去 [**提 Issue ↗**](https://github.com/luchiwanzi/dsh-tunnel/issues/new)，**您来许愿，我来实现！**
+
+[Releases](https://github.com/luchiwanzi/dsh-tunnel/releases) · [npm](https://www.npmjs.com/package/@wanziya/dsh-tunnel) · [Issues](https://github.com/luchiwanzi/dsh-tunnel/issues)
+
 模型请求由 **DSH 进程** 发出，不是由浏览器发出。所以「页面能打开」不代表模型接口能连上，「浏览器能访问国外网站」也不代表 DSH 能访问——尤其在国内云服务器上部署时，出站受限是常态。插件把这件事放进 DSH 的设置页：不用改系统代理、不动路由表，也不需要给整台机器套全局代理。
 
 桌面版和云服务器部署都适用。典型流程是 **导入订阅或粘贴 YAML → 选择节点 → 连接 → 测试出口 IP**。
@@ -20,6 +26,15 @@
 > **能力边界：本插件解决的是网络连接问题，不提供模型账号、API Key、订阅额度或代理节点。** 需要自行准备可用节点和相应模型凭据；实际可用性取决于节点质量、服务商支持地区、账号权限及服务条款，不能保证所有国外模型均可使用。
 >
 > 本插件不是系统级代理或 TUN 工具，不修改系统网络配置，也不会自动代理你本地浏览器中的登录授权页面。请遵守所在地适用法律及相关服务条款。
+
+## 包含的组件
+
+共 1 个 · 1 运行中
+
+| 组件 | 说明 | 状态 |
+|---|---|---|
+| `dsh-tunnel` | 外网连接插件本体：订阅解析、节点管理、本地 mihomo 内核编排与进程级代理注入 | ● 运行中 |
+| `mihomo`（内置内核） | [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) v1.19.33，按平台从 npm 包分发，启动前做 SHA256 字节级校验 | ● 随插件启动 |
 
 ## 安装
 
